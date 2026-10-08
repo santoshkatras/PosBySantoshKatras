@@ -1,0 +1,14 @@
+{
+  "command": "node server/start.mjs",
+  "build_path": ".",
+  "stack": "node24",
+  "memory": 512,
+  "env_variables": {
+    "TZ": "Asia/Kolkata",
+    "NODE_ENV": "production"
+  },
+  "scripts": {
+    "predeploy": "npm run build"
+  },
+  "catalyst_auth": false
+}

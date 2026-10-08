@@ -1,6 +1,9 @@
 node_modules
 uploads
 dist
+client/dist
+data/*.sqlite
+data/*.sqlite-*
 .next
 .turbo
 coverage
@@ -9,8 +12,7 @@ coverage
 .env.local
 .env.*.local
 .DS_Store
-apps/api/prisma/*.db
-apps/api/prisma/migrations/**/migration_lock.toml.bak
 *.tsbuildinfo
 playwright-report
 test-results
+.catalystrc
