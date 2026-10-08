@@ -5,6 +5,7 @@ import {
   DashboardPage,
   LocationsPage,
   LoginPage,
+  MenuPage,
   ModulePage,
   SettingsPage,
   SignupPage,
@@ -49,6 +50,7 @@ export function App() {
         <Route path="locations" element={<LocationsPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="menu/:slug" element={<MenuPage />} />
         <Route path="m/:feature" element={<ModulePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

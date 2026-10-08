@@ -33,21 +33,89 @@ export const STATES = [
 ];
 export const ADJUSTMENT_REASONS = ['damage', 'loss', 'found', 'internal_use', 'opening', 'correction'];
 export const NAV = [
-  { href: '/dashboard', label: 'Dashboard', permission: 'dashboard.view', feature: null, group: 'Home', ready: true },
-  { href: '/catalogue', label: 'Catalogue', permission: 'catalogue.view', feature: 'catalogue', group: 'Stock', ready: true },
-  { href: '/stock', label: 'Stock', permission: 'stock.view', feature: 'stock', group: 'Stock', ready: true },
-  { href: '/locations', label: 'Locations', permission: 'locations.view', feature: null, group: 'Stock', ready: true },
-  { href: '/m/purchase', label: 'Purchase', permission: 'purchase.view', feature: 'purchase', group: 'Trade', ready: false },
-  { href: '/m/sales', label: 'Sales', permission: 'sales.view', feature: 'sales', group: 'Trade', ready: false },
-  { href: '/m/customers', label: 'Customers', permission: 'customers.view', feature: 'customers', group: 'Trade', ready: false },
-  { href: '/m/reports', label: 'Reports', permission: 'reports.view', feature: 'reports', group: 'Trade', ready: false },
-  { href: '/m/serial', label: 'Serial numbers', permission: 'serial.view', feature: 'serial', group: 'Workshop', ready: false },
-  { href: '/m/warranty', label: 'Warranty', permission: 'warranty.view', feature: 'warranty', group: 'Workshop', ready: false },
-  { href: '/m/bike-service', label: 'Job cards', permission: 'bike_service.view', feature: 'bike_service', group: 'Workshop', ready: false },
-  { href: '/m/notifications', label: 'Notifications', permission: 'notifications.view', feature: 'notifications', group: 'Admin', ready: false },
-  { href: '/users', label: 'Users', permission: 'users.view', feature: 'users', group: 'Admin', ready: true },
-  { href: '/settings', label: 'Settings', permission: 'settings.view', feature: 'settings', group: 'Admin', ready: true },
+  { id: 'dashboard', href: '/dashboard', label: 'Dashboard', permission: 'dashboard.view', feature: null, ready: true, pin: true },
+  {
+    id: 'inventory',
+    label: 'Inventory',
+    children: [
+      { id: 'product', href: '/catalogue?tab=products', label: 'Product', permission: 'catalogue.view', feature: 'catalogue', ready: true, pin: true },
+      { id: 'category-brands', href: '/catalogue?tab=categories', label: 'Category & Brands', permission: 'catalogue.view', feature: 'catalogue', ready: true },
+      { id: 'price-list', href: '/menu/price-list', label: 'Price list', permission: 'catalogue.view', feature: 'catalogue', ready: false },
+      { id: 'price-updates', href: '/menu/price-updates', label: 'Price Updates', permission: 'catalogue.view', feature: 'catalogue', ready: false },
+      { id: 'print-barcodes', href: '/menu/print-barcodes', label: 'Print Barcodes', permission: 'catalogue.view', feature: 'catalogue', ready: false },
+      { id: 'transactions', label: 'Transactions:', heading: true },
+      { id: 'opening-stock', href: '/stock?mode=opening', label: 'Opening Stock Entry', permission: 'stock.view', feature: 'stock', ready: true, deep: true },
+      { id: 'stock-update', href: '/stock?mode=update', label: 'Stock Update', permission: 'stock.view', feature: 'stock', ready: true, deep: true },
+    ],
+  },
+  { id: 'stock', href: '/stock', label: 'Stock', permission: 'stock.view', feature: 'stock', ready: true, pin: true },
+  {
+    id: 'purchase',
+    label: 'Purchase',
+    children: [
+      { id: 'purchase-order', href: '/m/purchase?doc=order', label: 'Purchase Order', permission: 'purchase.view', feature: 'purchase', ready: false },
+      { id: 'receipt-note', href: '/m/purchase?doc=receipt', label: 'Receipt Note', permission: 'purchase.view', feature: 'purchase', ready: false },
+      { id: 'purchase-invoice', href: '/m/purchase?doc=invoice', label: 'Purchase invoice', permission: 'purchase.view', feature: 'purchase', ready: false },
+    ],
+  },
+  {
+    id: 'sales',
+    label: 'Sales',
+    children: [
+      { id: 'sales-quotation', href: '/m/sales?doc=quotation', label: 'Sales Quotation', permission: 'sales.view', feature: 'sales', ready: false },
+      { id: 'sales-order', href: '/m/sales?doc=order', label: 'Sales Order', permission: 'sales.view', feature: 'sales', ready: false },
+      { id: 'sales-bill', href: '/m/sales?doc=bill', label: 'Sales Bill', permission: 'sales.view', feature: 'sales', ready: false },
+    ],
+  },
+  {
+    id: 'promotions',
+    label: 'Promotions',
+    children: [
+      { id: 'offers', href: '/menu/offers', label: 'Offer Management', permission: 'sales.view', feature: 'sales', ready: false },
+      { id: 'loyalty', href: '/menu/loyalty', label: 'Loyalty Program', permission: 'sales.view', feature: 'sales', ready: false },
+      { id: 'coupons', href: '/menu/coupons', label: 'Discount Coupons', permission: 'sales.view', feature: 'sales', ready: false },
+      { id: 'vouchers', href: '/menu/vouchers', label: 'Gift Vouchers', permission: 'sales.view', feature: 'sales', ready: false },
+    ],
+  },
+  {
+    id: 'reports',
+    label: 'Reports',
+    children: [
+      { id: 'report-masters', href: '/m/reports?doc=masters', label: 'Masters', permission: 'reports.view', feature: 'reports', ready: false },
+      { id: 'report-sales', href: '/m/reports?doc=sales', label: 'Sales', permission: 'reports.view', feature: 'reports', ready: false },
+      { id: 'report-purchase', href: '/m/reports?doc=purchase', label: 'Purchase', permission: 'reports.view', feature: 'reports', ready: false },
+      { id: 'report-stock', href: '/m/reports?doc=stock', label: 'Stock Transactions', permission: 'reports.view', feature: 'reports', ready: false },
+      { id: 'report-promos', href: '/m/reports?doc=promotions', label: 'Promotions', permission: 'reports.view', feature: 'reports', ready: false },
+    ],
+  },
+  {
+    id: 'configurations',
+    label: 'Configurations',
+    children: [
+      { id: 'branch-locations', href: '/locations', label: 'Branch & Locations Setups', tabLabel: 'Branches', permission: 'locations.view', feature: null, ready: true, pin: true },
+      { id: 'main-category', href: '/menu/main-category', label: 'Main Category Setups', permission: 'settings.view', feature: 'settings', ready: false },
+      { id: 'gst-setups', href: '/settings?section=gst', label: 'GST Setups', permission: 'settings.view', feature: 'settings', ready: true },
+      { id: 'master-config', href: '/settings?section=master', label: 'Master Configurations', permission: 'settings.view', feature: 'settings', ready: true },
+      { id: 'sales-config', href: '/menu/sales-config', label: 'Sales Configurations', permission: 'settings.view', feature: 'settings', ready: false },
+      { id: 'purchase-config', href: '/menu/purchase-config', label: 'Purchase Configurations', permission: 'settings.view', feature: 'settings', ready: false },
+      { id: 'stock-config', href: '/menu/stock-config', label: 'Stock Transactions Con.', permission: 'settings.view', feature: 'settings', ready: false },
+      { id: 'promo-config', href: '/menu/promo-config', label: 'Promotions Config', permission: 'settings.view', feature: 'settings', ready: false },
+      { id: 'user-groups', href: '/users?section=groups', label: 'User Group Setup', permission: 'users.view', feature: 'users', ready: true },
+      { id: 'user-creations', href: '/users?section=users', label: 'User Creations', permission: 'users.view', feature: 'users', ready: true },
+      { id: 'user-rights', href: '/users?section=rights', label: 'User Rights Mngt.', permission: 'users.view', feature: 'users', ready: true },
+    ],
+  },
 ];
+
+export function findMenuPage(slug) {
+  const href = `/menu/${slug}`;
+  for (const item of NAV) {
+    for (const child of item.children || []) {
+      if (child.href === href) return child;
+    }
+  }
+  return null;
+}
 
 const ALL = [...PERMISSIONS];
 export function permissionsForRole(role) {

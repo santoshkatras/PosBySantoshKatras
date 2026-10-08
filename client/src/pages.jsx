@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ADJUSTMENT_REASONS,
   COPY,
   GST_RATES,
   STATES,
+  findMenuPage,
   stateName,
 } from '../../shared/domain.mjs';
 import { ApiError } from './api.js';
@@ -19,6 +20,12 @@ const FEATURES = {
   warranty: { key: 'warranty', title: 'Warranty', body: 'Warranty dates will follow the sale, with a lookup by serial, invoice, or mobile.' },
   'bike-service': { key: 'bike_service', title: 'Job cards', body: 'Vehicle check-in, estimates, mechanic assignment, and parts issued from stock will run on top of this catalogue.' },
   notifications: { key: 'notifications', title: 'Notifications', body: 'Email, and later SMS and WhatsApp, will use the same events the ledger and invoices already record.' },
+};
+
+const DOC_LABELS = {
+  purchase: { order: 'Purchase Order', receipt: 'Receipt Note', invoice: 'Purchase invoice' },
+  sales: { quotation: 'Sales Quotation', order: 'Sales Order', bill: 'Sales Bill' },
+  reports: { masters: 'Masters', sales: 'Sales', purchase: 'Purchase', stock: 'Stock Transactions', promotions: 'Promotions' },
 };
 
 const LABELS = {
@@ -264,7 +271,11 @@ export function DashboardPage() {
 
 export function CataloguePage() {
   const { request, can } = useAuth();
-  const [tab, setTab] = useState('products');
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') === 'categories' ? 'categories' : 'products';
+  function setTab(next) {
+    setParams(next === 'products' ? {} : { tab: next }, { replace: true });
+  }
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -356,15 +367,15 @@ export function CataloguePage() {
   return (
     <>
       <div className="int-tabs">
-        {['products', 'categories', 'brands'].map((item) => (
-          <button key={item} type="button" className={tab === item ? 'on' : undefined} onClick={() => setTab(item)}>{item}</button>
+        {[['products', 'Product'], ['categories', 'Category & Brands']].map(([item, label]) => (
+          <button key={item} type="button" className={tab === item ? 'on' : undefined} onClick={() => setTab(item)}>{label}</button>
         ))}
       </div>
       {error ? <p className="banner">{error}</p> : null}
       {tab === 'products' ? (
         <section className="data-grid">
           <div className="grid-toolbar">
-            <h2 className="grid-title">Catalogue</h2>
+            <h2 className="grid-title">Product</h2>
             <form className="grid-search" onSubmit={(event) => { event.preventDefault(); load().catch((err) => setError(message(err))); }}>
               <input value={query} placeholder="Search products" onChange={(event) => setQuery(event.target.value)} />
             </form>
@@ -392,28 +403,28 @@ export function CataloguePage() {
         </section>
       ) : null}
       {tab === 'categories' ? (
-        <section className="card">
-          <h2>Categories</h2>
-          {can('catalogue.manage') ? (
-            <form className="filters" onSubmit={addCategory}>
-              <label>Name<input required value={categoryName} onChange={(event) => setCategoryName(event.target.value)} /></label>
-              <button className="btn primary" type="submit">Add category</button>
-            </form>
-          ) : null}
-          <ul className="dept-list">{categories.map((item) => <li key={item.id}><span>{item.name}</span><span className="muted">{item.parent_id ? 'Child' : 'Top level'}</span></li>)}</ul>
-        </section>
-      ) : null}
-      {tab === 'brands' ? (
-        <section className="card">
-          <h2>Brands</h2>
-          {can('catalogue.manage') ? (
-            <form className="filters" onSubmit={addBrand}>
-              <label>Name<input required value={brandName} onChange={(event) => setBrandName(event.target.value)} /></label>
-              <button className="btn primary" type="submit">Add brand</button>
-            </form>
-          ) : null}
-          <ul className="dept-list">{brands.map((item) => <li key={item.id}><span>{item.name}</span></li>)}</ul>
-        </section>
+        <>
+          <section className="card">
+            <h2>Categories</h2>
+            {can('catalogue.manage') ? (
+              <form className="filters" onSubmit={addCategory}>
+                <label>Name<input required value={categoryName} onChange={(event) => setCategoryName(event.target.value)} /></label>
+                <button className="btn primary" type="submit">Add category</button>
+              </form>
+            ) : null}
+            <ul className="dept-list">{categories.map((item) => <li key={item.id}><span>{item.name}</span><span className="muted">{item.parent_id ? 'Child' : 'Top level'}</span></li>)}</ul>
+          </section>
+          <section className="card">
+            <h2>Brands</h2>
+            {can('catalogue.manage') ? (
+              <form className="filters" onSubmit={addBrand}>
+                <label>Name<input required value={brandName} onChange={(event) => setBrandName(event.target.value)} /></label>
+                <button className="btn primary" type="submit">Add brand</button>
+              </form>
+            ) : null}
+            <ul className="dept-list">{brands.map((item) => <li key={item.id}><span>{item.name}</span></li>)}</ul>
+          </section>
+        </>
       ) : null}
       {open ? (
         <Modal title="New product" onClose={() => setOpen(false)}>
@@ -474,6 +485,9 @@ function blankProduct(unitId = '') {
 
 export function StockPage() {
   const { request, can } = useAuth();
+  const [params] = useSearchParams();
+  const mode = params.get('mode');
+  const stockTitle = mode === 'opening' ? 'Opening Stock Entry' : mode === 'update' ? 'Stock Update' : 'Stock';
   const [rows, setRows] = useState([]);
   const [movements, setMovements] = useState([]);
   const [query, setQuery] = useState('');
@@ -482,7 +496,11 @@ export function StockPage() {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState('');
-  const [form, setForm] = useState({ variantId: '', locationId: '', qtyDelta: '', reason: 'correction', note: '' });
+  const [form, setForm] = useState({ variantId: '', locationId: '', qtyDelta: '', reason: mode === 'opening' ? 'opening' : 'correction', note: '' });
+
+  useEffect(() => {
+    setForm((current) => ({ ...current, reason: mode === 'opening' ? 'opening' : 'correction' }));
+  }, [mode]);
 
   async function load(search = query) {
     const [stock, ledger] = await Promise.all([
@@ -514,7 +532,7 @@ export function StockPage() {
     try {
       await request('/stock/adjustments', { method: 'POST', body: { ...form, qtyDelta: Number(form.qtyDelta) } });
       setOpen(false);
-      setForm({ variantId: '', locationId: '', qtyDelta: '', reason: 'correction', note: '' });
+      setForm({ variantId: '', locationId: '', qtyDelta: '', reason: mode === 'opening' ? 'opening' : 'correction', note: '' });
       await load();
     } catch (err) {
       setFormError(message(err));
@@ -528,7 +546,7 @@ export function StockPage() {
       {error ? <p className="banner">{error}</p> : null}
       <section className="data-grid">
         <div className="grid-toolbar">
-          <h2 className="grid-title">On hand</h2>
+          <h2 className="grid-title">{stockTitle}</h2>
           <form className="grid-search" onSubmit={(event) => { event.preventDefault(); load().catch((err) => setError(message(err))); }}>
             <input value={query} placeholder="Search SKU or name" onChange={(event) => setQuery(event.target.value)} />
           </form>
@@ -688,6 +706,9 @@ export function LocationsPage() {
 
 export function UsersPage() {
   const { request, can, session } = useAuth();
+  const [params] = useSearchParams();
+  const section = params.get('section') === 'groups' || params.get('section') === 'rights' ? params.get('section') : 'users';
+  const sectionTitle = section === 'groups' ? 'User Group Setup' : section === 'rights' ? 'User Rights Mngt.' : 'User Creations';
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -736,38 +757,55 @@ export function UsersPage() {
     <>
       <div className="wf-head">
         <div>
-          <h1>Users</h1>
-          <p>{users.length} of {session.limits.users} seats</p>
+          <h1>{sectionTitle}</h1>
+          <p>{section === 'users' ? `${users.length} of ${session.limits.users} seats` : `${roles.length} groups`}</p>
         </div>
-        {can('users.manage') ? <button type="button" className="btn primary" onClick={() => setOpen(true)}>Add user</button> : null}
+        {section === 'users' && can('users.manage') ? <button type="button" className="btn primary" onClick={() => setOpen(true)}>Add user</button> : null}
       </div>
       {error ? <p className="banner">{error}</p> : null}
-      <section className="data-grid">
-        <div className="table-wrap">
-          <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
-            <tbody>
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.name}</td>
-                  <td>{user.email}</td>
-                  <td>{user.role_name}</td>
-                  <td><span className={`badge ${user.status}`}>{user.status}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-      <section className="card">
-        <h2>Roles</h2>
-        {roles.map((role) => (
-          <div className="module-row" key={role.id}>
-            <div><strong>{role.name}</strong><span className="muted">{role.permissions.length} permissions</span></div>
-            <span className="badge">{role.code}</span>
+      {section === 'users' ? (
+        <section className="data-grid">
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
+              <tbody>
+                {users.map((user) => (
+                  <tr key={user.id}>
+                    <td>{user.name}</td>
+                    <td>{user.email}</td>
+                    <td>{user.role_name}</td>
+                    <td><span className={`badge ${user.status}`}>{user.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))}
-      </section>
+        </section>
+      ) : null}
+      {section === 'groups' ? (
+        <section className="card">
+          <h2>User Group Setup</h2>
+          {roles.map((role) => (
+            <div className="module-row" key={role.id}>
+              <div><strong>{role.name}</strong><span className="muted">{role.code}</span></div>
+              <span className="badge">{role.permissions.length} rights</span>
+            </div>
+          ))}
+        </section>
+      ) : null}
+      {section === 'rights' ? (
+        <section className="card">
+          <h2>User Rights Mngt.</h2>
+          {roles.map((role) => (
+            <div className="module-row" key={role.id}>
+              <div>
+                <strong>{role.name}</strong>
+                <span className="muted">{role.permissions.join(', ')}</span>
+              </div>
+            </div>
+          ))}
+        </section>
+      ) : null}
       {open ? (
         <Modal title="New user" onClose={() => setOpen(false)}>
           <form className="stack" onSubmit={create}>
@@ -800,6 +838,8 @@ export function UsersPage() {
 
 export function SettingsPage() {
   const { session, request, can, refreshSession } = useAuth();
+  const [params] = useSearchParams();
+  const section = params.get('section') === 'gst' ? 'gst' : 'master';
   const [name, setName] = useState(session.tenant.name);
   const [legalName, setLegalName] = useState(session.tenant.legalName || '');
   const [gstin, setGstin] = useState(session.tenant.gstin || '');
@@ -837,7 +877,7 @@ export function SettingsPage() {
     <>
       <div className="wf-head">
         <div>
-          <h1>Settings</h1>
+          <h1>{section === 'gst' ? 'GST Setups' : 'Master Configurations'}</h1>
           <p>{session.tenant.plan.name} · {stateName(session.tenant.stateCode)}</p>
         </div>
       </div>
@@ -852,7 +892,7 @@ export function SettingsPage() {
           <div className="actions"><button className="btn primary" type="submit" disabled={pending || !can('settings.manage')}>Save</button></div>
         </form>
       </section>
-      <section className="card">
+      {section === 'master' ? <section className="card">
         <h2>Modules</h2>
         <p className="muted">Users and settings stay on. Other modules follow the plan, then this toggle.</p>
         {session.modules.map((module) => (
@@ -871,14 +911,29 @@ export function SettingsPage() {
             </button>
           </div>
         ))}
-      </section>
+      </section> : null}
     </>
+  );
+}
+
+export function MenuPage() {
+  const { slug } = useParams();
+  const item = findMenuPage(slug);
+  if (!item) return <p className="banner">That page is not part of Stockkeep.</p>;
+  return (
+    <section className="card">
+      <h2>{item.label}</h2>
+      <p>This screen is next in the menu. The list is already in place so the rest of the shop stays in the same order.</p>
+      <p className="pad-top"><span className="badge pending">Coming soon</span></p>
+    </section>
   );
 }
 
 export function ModulePage() {
   const { feature } = useParams();
+  const [params] = useSearchParams();
   const meta = FEATURES[feature];
+  const docTitle = DOC_LABELS[feature]?.[params.get('doc')];
   const { request } = useAuth();
   const [status, setStatus] = useState('');
 
@@ -892,8 +947,8 @@ export function ModulePage() {
   if (!meta) return <p className="banner">That page is not part of Stockkeep.</p>;
   return (
     <section className="card">
-      <h2>{meta.title}</h2>
-      <p>{meta.body}</p>
+      <h2>{docTitle || meta.title}</h2>
+      <p>{docTitle ? `${docTitle} uses this ${meta.title.toLowerCase()} module. ${meta.body}` : meta.body}</p>
       <p className="pad-top"><span className="badge pending">Coming soon</span></p>
       {status ? <p className="muted pad-top">{status}</p> : null}
     </section>
