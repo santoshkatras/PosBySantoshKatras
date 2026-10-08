@@ -1,0 +1,38 @@
+{
+  "name": "stockkeep",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Multi-tenant inventory and service management for Indian computer shops and bike service centres.",
+  "packageManager": "pnpm@10.33.3",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "ensure-env": "node scripts/ensure-env.mjs",
+    "dev": "pnpm ensure-env && turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "turbo typecheck",
+    "test": "pnpm ensure-env && turbo test",
+    "db:migrate": "pnpm ensure-env && pnpm --filter @stockkeep/api db:migrate",
+    "db:seed": "pnpm ensure-env && pnpm --filter @stockkeep/types build && pnpm --filter @stockkeep/api db:seed",
+    "db:generate": "pnpm --filter @stockkeep/api db:generate"
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3",
+    "turbo": "^2.5.4",
+    "typescript": "^5.7.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "bcrypt",
+      "esbuild",
+      "prisma"
+    ]
+  }
+}
