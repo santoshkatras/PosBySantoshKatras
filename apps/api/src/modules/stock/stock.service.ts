@@ -114,9 +114,10 @@ export class StockService {
     try {
       rows = await this.db.client.$queryRaw<Array<{ qty_on_hand: Prisma.Decimal | string }>>`
         INSERT INTO stock_levels (
-          tenant_id, location_id, variant_id, qty_on_hand, qty_reserved, updated_at
+          id, tenant_id, location_id, variant_id, qty_on_hand, qty_reserved, updated_at
         )
         VALUES (
+          gen_random_uuid(),
           CAST(${user.tenantId} AS uuid),
           CAST(${input.locationId} AS uuid),
           CAST(${input.variantId} AS uuid),

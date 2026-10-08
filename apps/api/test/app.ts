@@ -60,5 +60,12 @@ export async function createProduct(app: INestApplication, token: string, name: 
   if (response.status !== 201) {
     throw new Error(`Product failed (${response.status}): ${JSON.stringify(response.body)}`);
   }
-  return response.body as { id: string; name: string };
+  const body = response.body as {
+    id: string;
+    name: string;
+    variants: Array<{ id: string; sku: string }>;
+  };
+  const variant = body.variants[0];
+  if (!variant) throw new Error('Product was created without a variant');
+  return { id: body.id, name: body.name, variantId: variant.id, sku: variant.sku };
 }
