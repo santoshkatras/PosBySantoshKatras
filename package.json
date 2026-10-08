@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.2.0",
   "type": "module",
-  "description": "Multi-tenant inventory for Indian computer shops and bike service centres. One Node process, SQLite, served the same way as TechCizHRMS on Catalyst AppSail.",
+  "description": "Multi-tenant inventory for Indian computer shops and bike service centres. One Node process on Catalyst AppSail, with Catalyst Data Store tables in the same shape as TechCizHRMS.",
   "engines": {
     "node": ">=22"
   },
@@ -20,6 +20,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.8.2",
-    "vite": "^6.3.6"
+    "vite": "^6.3.6",
+    "zcatalyst-sdk-node": "^2.5.1"
   }
 }

@@ -1,13 +1,13 @@
 import express from 'express';
-import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FEATURE_KEYS, LOCKED_FEATURES } from '../shared/domain.mjs';
 import { hashPassword, hashToken, newRefreshToken, readAccess, signAccess, verifyPassword } from './auth.mjs';
-import { openDb } from './db.mjs';
-import { provisionTenant } from './provision.mjs';
 import { loadSession } from './session.mjs';
+import { provisionTenant } from './provision.mjs';
+import { seedDemos } from './seed.mjs';
+import { openStore } from './store.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const clientRoot = join(here, '..', 'client');
@@ -16,6 +16,10 @@ const loginHits = new Map();
 
 function fail(res, status, code, message) {
   res.status(status).json({ statusCode: status, code, message });
+}
+
+function route(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 }
 
 function cookies(req) {
@@ -35,41 +39,58 @@ function clearRefresh(res) {
   res.append('Set-Cookie', 'sk_refresh=; HttpOnly; Path=/api/auth; SameSite=Lax; Max-Age=0');
 }
 
-function issue(db, res, userId, tenantId) {
-  const raw = newRefreshToken();
-  db.prepare(`
-    INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked)
-    VALUES (?, ?, ?, ?, 0)
-  `).run(randomUUID(), userId, hashToken(raw), new Date(Date.now() + 14 * 86400000).toISOString());
-  refreshCookie(res, raw);
-  const session = loadSession(db, userId);
-  return { accessToken: signAccess(userId, tenantId), ...session };
-}
-
 function bearer(req) {
   const header = req.headers.authorization || '';
   return header.startsWith('Bearer ') ? header.slice(7) : null;
 }
 
-function requireUser(db) {
-  return (req, res, next) => {
+function qty(value) {
+  return Number(value).toFixed(3);
+}
+
+function money(value) {
+  if (value == null || value === '') return '';
+  return Number(value).toFixed(2);
+}
+
+function inr(value) {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(value) || 0);
+}
+
+function on(value) {
+  return Number(value) === 1;
+}
+
+async function issue(store, res, userId, companyId) {
+  const raw = newRefreshToken();
+  await store.insert('refresh_tokens', {
+    user_id: userId,
+    token_hash: hashToken(raw),
+    expires_at: new Date(Date.now() + 14 * 86400000).toISOString(),
+    revoked: 0,
+  });
+  refreshCookie(res, raw);
+  const session = await loadSession(store, userId);
+  return { accessToken: signAccess(userId, companyId), ...session };
+}
+
+function requireUser(store) {
+  return route(async (req, res, next) => {
     const payload = readAccess(bearer(req));
     if (!payload) return fail(res, 401, 'UNAUTHENTICATED', 'Sign in again.');
-    const session = loadSession(db, payload.sub);
-    if (!session || session.tenant.id !== payload.tid) return fail(res, 401, 'UNAUTHENTICATED', 'Sign in again.');
+    const session = await loadSession(store, payload.sub);
+    if (!session || session.tenant.id !== String(payload.tid)) return fail(res, 401, 'UNAUTHENTICATED', 'Sign in again.');
     req.session = session;
-    req.tenantId = session.tenant.id;
+    req.companyId = session.tenant.id;
     next();
-  };
+  });
 }
 
 function allow(permission, feature) {
   return (req, res, next) => {
     if (feature) {
       const module = req.session.modules.find((item) => item.key === feature);
-      if (!module?.enabled) {
-        return fail(res, 403, 'MODULE_DISABLED', 'This module is not enabled for your business.');
-      }
+      if (!module?.enabled) return fail(res, 403, 'MODULE_DISABLED', 'This module is not enabled for your business.');
     }
     if (permission && !req.session.user.permissions.includes(permission)) {
       return fail(res, 403, 'PERMISSION_DENIED', 'You do not have permission for this action.');
@@ -80,33 +101,34 @@ function allow(permission, feature) {
 
 function locationAllowed(session, locationId) {
   const ids = session.user.locationIds;
-  return ids.length === 0 || ids.includes(locationId);
-}
-
-function qty(value) {
-  return Number(value).toFixed(3);
-}
-
-function money(value) {
-  if (value == null || value === '') return null;
-  return Number(value).toFixed(2);
-}
-
-function inr(value) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(value) || 0);
+  return ids.length === 0 || ids.includes(String(locationId));
 }
 
 export async function createApp(options = {}) {
-  const db = openDb(options.dbPath);
+  const store = await openStore(options);
   const app = express();
+  let seeded = false;
   app.use(express.json({ limit: '1mb' }));
+  app.use(route(async (req, _res, next) => {
+    store.attach?.(req);
+    if (process.env.X_ZOHO_CATALYST_LISTEN_PORT && !seeded) {
+      seeded = true;
+      try {
+        await seedDemos(store);
+      } catch (error) {
+        seeded = false;
+        throw error;
+      }
+    }
+    next();
+  }));
 
-  app.get('/api/health', (_req, res) => {
-    db.prepare('SELECT 1').get();
-    res.json({ status: 'ok', database: 'sqlite' });
-  });
+  app.get('/api/health', route(async (_req, res) => {
+    await store.ping();
+    res.json({ status: 'ok', database: store.kind === 'memory' ? 'memory' : 'catalyst' });
+  }));
 
-  app.post('/api/auth/signup', (req, res) => {
+  app.post('/api/auth/signup', route(async (req, res) => {
     const body = req.body ?? {};
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
@@ -123,14 +145,13 @@ export async function createApp(options = {}) {
     if (body.gstin && !String(body.gstin).toUpperCase().startsWith(body.stateCode)) {
       return fail(res, 400, 'INVALID', 'GSTIN must start with the state code.');
     }
-    if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
-      return fail(res, 409, 'EMAIL_TAKEN', 'That email is already registered.');
-    }
-    const created = provisionTenant(db, { ...body, email });
-    res.status(201).json(issue(db, res, created.userId, created.tenantId));
-  });
+    const existing = await store.find('users', { email });
+    if (existing.length) return fail(res, 409, 'EMAIL_TAKEN', 'That email is already registered.');
+    const created = await provisionTenant(store, { ...body, email });
+    res.status(201).json(await issue(store, res, created.userId, created.companyId));
+  }));
 
-  app.post('/api/auth/login', (req, res) => {
+  app.post('/api/auth/login', route(async (req, res) => {
     const ip = req.ip || 'local';
     const hit = loginHits.get(ip) || { count: 0, at: Date.now() };
     if (Date.now() - hit.at > 15 * 60 * 1000) {
@@ -139,240 +160,242 @@ export async function createApp(options = {}) {
     }
     if (hit.count >= 10) return fail(res, 429, 'RATE_LIMIT', 'Too many sign-in attempts. Wait 15 minutes.');
     const email = String(req.body?.email || '').trim().toLowerCase();
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const [user] = await store.find('users', { email });
     if (!user || !verifyPassword(String(req.body?.password || ''), user.password_hash)) {
       hit.count += 1;
       loginHits.set(ip, hit);
       return fail(res, 401, 'INVALID_LOGIN', 'Email or password is incorrect.');
     }
     loginHits.set(ip, { count: 0, at: Date.now() });
-    res.json(issue(db, res, user.id, user.tenant_id));
-  });
+    res.json(await issue(store, res, user.id, user.company_id));
+  }));
 
-  app.post('/api/auth/refresh', (req, res) => {
+  app.post('/api/auth/refresh', route(async (req, res) => {
     const raw = cookies(req).sk_refresh;
     if (!raw) return fail(res, 401, 'UNAUTHENTICATED', 'Sign in again.');
-    const row = db.prepare('SELECT * FROM refresh_tokens WHERE token_hash = ?').get(hashToken(raw));
-    if (!row || row.revoked || new Date(row.expires_at).getTime() < Date.now()) {
+    const [row] = await store.find('refresh_tokens', { token_hash: hashToken(raw) });
+    if (!row || on(row.revoked) || new Date(row.expires_at).getTime() < Date.now()) {
       return fail(res, 401, 'UNAUTHENTICATED', 'Sign in again.');
     }
-    db.prepare('UPDATE refresh_tokens SET revoked = 1 WHERE id = ?').run(row.id);
-    const user = db.prepare('SELECT id, tenant_id FROM users WHERE id = ?').get(row.user_id);
-    res.json({ accessToken: issue(db, res, user.id, user.tenant_id).accessToken });
-  });
+    await store.update('refresh_tokens', row.id, { revoked: 1 });
+    const [user] = await store.find('users', { id: row.user_id });
+    const issued = await issue(store, res, user.id, user.company_id);
+    res.json({ accessToken: issued.accessToken });
+  }));
 
-  app.post('/api/auth/logout', (req, res) => {
+  app.post('/api/auth/logout', route(async (req, res) => {
     const raw = cookies(req).sk_refresh;
-    if (raw) db.prepare('UPDATE refresh_tokens SET revoked = 1 WHERE token_hash = ?').run(hashToken(raw));
+    if (raw) {
+      const [row] = await store.find('refresh_tokens', { token_hash: hashToken(raw) });
+      if (row) await store.update('refresh_tokens', row.id, { revoked: 1 });
+    }
     clearRefresh(res);
     res.json({ ok: true });
-  });
+  }));
 
-  const auth = requireUser(db);
+  const auth = requireUser(store);
   app.get('/api/auth/me', auth, (req, res) => res.json(req.session));
 
-  app.get('/api/dashboard/summary', auth, allow('dashboard.view'), (req, res) => {
-    const tid = req.tenantId;
-    const locations = scopedLocations(db, req.session);
-    const ids = locations.map((row) => row.id);
-    const products = db.prepare('SELECT COUNT(*) AS n FROM products WHERE tenant_id = ? AND is_active = 1').get(tid).n;
-    const skus = db.prepare('SELECT COUNT(*) AS n FROM variants WHERE tenant_id = ? AND is_active = 1').get(tid).n;
+  app.get('/api/dashboard/summary', auth, allow('dashboard.view'), route(async (req, res) => {
+    const locations = await scopedLocations(store, req.session);
+    const ids = new Set(locations.map((row) => row.id));
+    const products = (await store.find('products', { company_id: req.companyId })).filter((row) => on(row.is_active));
+    const variants = (await store.find('variants', { company_id: req.companyId })).filter((row) => on(row.is_active));
+    const levels = await store.find('stock_levels', { company_id: req.companyId });
     let low = 0;
     let value = 0;
-    if (ids.length) {
-      const marks = ids.map(() => '?').join(',');
-      const rows = db.prepare(`
-        SELECT sl.qty_on_hand, v.min_stock, v.cost_price
-        FROM variants v
-        LEFT JOIN stock_levels sl ON sl.variant_id = v.id AND sl.location_id IN (${marks}) AND sl.tenant_id = v.tenant_id
-        WHERE v.tenant_id = ? AND v.is_active = 1
-      `).all(...ids, tid);
-      for (const row of rows) {
-        const onHand = Number(row.qty_on_hand || 0);
-        if (Number(row.min_stock) > 0 && onHand <= Number(row.min_stock)) low += 1;
-        value += onHand * Number(row.cost_price || 0);
-      }
+    for (const variant of variants) {
+      const onHand = levels
+        .filter((row) => row.variant_id === variant.id && ids.has(row.location_id))
+        .reduce((sum, row) => sum + Number(row.qty_on_hand || 0), 0);
+      if (Number(variant.min_stock) > 0 && onHand <= Number(variant.min_stock)) low += 1;
+      value += onHand * Number(variant.cost_price || 0);
     }
-    const movements = db.prepare(`
-      SELECT m.id, m.qty, m.movement_type, m.reason, m.note, m.created_at, l.name AS location_name, p.name AS product_name, v.sku
-      FROM stock_movements m
-      JOIN locations l ON l.id = m.location_id
-      JOIN variants v ON v.id = m.variant_id
-      JOIN products p ON p.id = v.product_id
-      WHERE m.tenant_id = ?
-      ORDER BY m.created_at DESC LIMIT 8
-    `).all(tid);
+    const movements = await recentMovements(store, req.companyId, 8);
     res.json({
       locations: locations.length,
-      products,
-      skus,
+      products: products.length,
+      skus: variants.length,
       lowStock: low,
       stockValue: value.toFixed(2),
       stockValueLabel: inr(value),
       recentMovements: movements,
     });
-  });
+  }));
 
-  app.get('/api/locations', auth, allow('locations.view'), (req, res) => {
-    res.json({ items: scopedLocations(db, req.session) });
-  });
+  app.get('/api/locations', auth, allow('locations.view'), route(async (req, res) => {
+    res.json({ items: await scopedLocations(store, req.session) });
+  }));
 
-  app.post('/api/locations', auth, allow('locations.manage'), (req, res) => {
-    const count = db.prepare('SELECT COUNT(*) AS n FROM locations WHERE tenant_id = ? AND is_active = 1').get(req.tenantId).n;
-    if (count >= req.session.limits.locations) return fail(res, 400, 'LIMIT', 'This plan has no room for another location.');
+  app.post('/api/locations', auth, allow('locations.manage'), route(async (req, res) => {
+    const active = (await store.find('locations', { company_id: req.companyId })).filter((row) => on(row.is_active));
+    if (active.length >= req.session.limits.locations) return fail(res, 400, 'LIMIT', 'This plan has no room for another location.');
     const name = String(req.body?.name || '').trim();
     if (name.length < 2) return fail(res, 400, 'INVALID', 'Enter a location name.');
-    const id = randomUUID();
-    db.prepare('INSERT INTO locations (id, tenant_id, name, kind) VALUES (?, ?, ?, ?)').run(
-      id, req.tenantId, name, req.body.kind || 'store',
-    );
-    res.status(201).json(db.prepare('SELECT * FROM locations WHERE id = ?').get(id));
-  });
+    const saved = await store.insert('locations', {
+      company_id: req.companyId,
+      name,
+      kind: req.body.kind || 'store',
+      is_active: 1,
+    });
+    res.status(201).json(saved);
+  }));
 
-  app.get('/api/users', auth, allow('users.view', 'users'), (req, res) => {
-    const items = db.prepare(`
-      SELECT u.id, u.name, u.email, u.status, r.code AS role_code, r.name AS role_name
-      FROM users u JOIN roles r ON r.id = u.role_id
-      WHERE u.tenant_id = ? ORDER BY u.name
-    `).all(req.tenantId);
+  app.get('/api/users', auth, allow('users.view', 'users'), route(async (req, res) => {
+    const users = await store.find('users', { company_id: req.companyId });
+    const roles = await store.find('roles', { company_id: req.companyId });
+    const items = users.map((user) => {
+      const role = roles.find((item) => item.id === user.role_id);
+      return { id: user.id, name: user.name, email: user.email, status: user.status, role_code: role?.code, role_name: role?.name };
+    }).sort((a, b) => a.name.localeCompare(b.name));
     res.json({ items });
-  });
+  }));
 
-  app.get('/api/roles', auth, allow('users.view', 'users'), (req, res) => {
-    const roles = db.prepare('SELECT * FROM roles WHERE tenant_id = ? ORDER BY name').all(req.tenantId);
+  app.get('/api/roles', auth, allow('users.view', 'users'), route(async (req, res) => {
+    const roles = (await store.find('roles', { company_id: req.companyId })).sort((a, b) => a.name.localeCompare(b.name));
+    const rights = await store.find('role_rights', { company_id: req.companyId });
     res.json({
       items: roles.map((role) => ({
         ...role,
-        permissions: db.prepare('SELECT permission FROM role_permissions WHERE role_id = ?').all(role.id).map((row) => row.permission),
+        permissions: rights.filter((row) => row.role_id === role.id).map((row) => row.permission),
       })),
     });
-  });
+  }));
 
-  app.post('/api/users', auth, allow('users.manage', 'users'), (req, res) => {
-    const count = db.prepare("SELECT COUNT(*) AS n FROM users WHERE tenant_id = ? AND status = 'active'").get(req.tenantId).n;
-    if (count >= req.session.limits.users) return fail(res, 400, 'LIMIT', 'This plan has no room for another user.');
+  app.post('/api/users', auth, allow('users.manage', 'users'), route(async (req, res) => {
+    const active = (await store.find('users', { company_id: req.companyId })).filter((row) => row.status === 'active');
+    if (active.length >= req.session.limits.users) return fail(res, 400, 'LIMIT', 'This plan has no room for another user.');
     const email = String(req.body?.email || '').trim().toLowerCase();
     const name = String(req.body?.name || '').trim();
     const password = String(req.body?.password || '');
     if (name.length < 2 || !email || password.length < 8) return fail(res, 400, 'INVALID', 'Name, email, and a password of 8 characters are required.');
-    if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) return fail(res, 409, 'EMAIL_TAKEN', 'That email is already registered.');
-    const role = db.prepare('SELECT * FROM roles WHERE id = ? AND tenant_id = ?').get(req.body.roleId, req.tenantId);
-    if (!role || role.code === 'owner') return fail(res, 400, 'INVALID', 'Choose a role other than owner.');
-    const id = randomUUID();
-    db.prepare('INSERT INTO users (id, tenant_id, role_id, name, email, password_hash) VALUES (?, ?, ?, ?, ?, ?)').run(
-      id, req.tenantId, role.id, name, email, hashPassword(password),
-    );
+    if ((await store.find('users', { email })).length) return fail(res, 409, 'EMAIL_TAKEN', 'That email is already registered.');
+    const [role] = await store.find('roles', { id: req.body.roleId });
+    if (!role || role.company_id !== req.companyId || role.code === 'owner') return fail(res, 400, 'INVALID', 'Choose a role other than owner.');
+    const user = await store.insert('users', {
+      company_id: req.companyId,
+      role_id: role.id,
+      name,
+      email,
+      password_hash: hashPassword(password),
+      status: 'active',
+      created_at: new Date().toISOString(),
+    });
     for (const locationId of req.body.locationIds ?? []) {
-      if (db.prepare('SELECT id FROM locations WHERE id = ? AND tenant_id = ?').get(locationId, req.tenantId)) {
-        db.prepare('INSERT INTO user_locations (user_id, location_id) VALUES (?, ?)').run(id, locationId);
+      const [location] = await store.find('locations', { id: locationId });
+      if (location && location.company_id === req.companyId) {
+        await store.insert('user_locations', { company_id: req.companyId, user_id: user.id, location_id: location.id });
       }
     }
-    res.status(201).json({ id });
-  });
+    res.status(201).json({ id: user.id });
+  }));
 
-  app.get('/api/categories', auth, allow('catalogue.view', 'catalogue'), (req, res) => {
-    res.json({ items: db.prepare('SELECT * FROM categories WHERE tenant_id = ? ORDER BY name').all(req.tenantId) });
-  });
-  app.post('/api/categories', auth, allow('catalogue.manage', 'catalogue'), (req, res) => {
+  app.get('/api/categories', auth, allow('catalogue.view', 'catalogue'), route(async (req, res) => {
+    const items = (await store.find('categories', { company_id: req.companyId })).sort((a, b) => a.name.localeCompare(b.name));
+    res.json({ items });
+  }));
+  app.post('/api/categories', auth, allow('catalogue.manage', 'catalogue'), route(async (req, res) => {
     const name = String(req.body?.name || '').trim();
     if (!name) return fail(res, 400, 'INVALID', 'Enter a category name.');
-    const id = randomUUID();
-    db.prepare('INSERT INTO categories (id, tenant_id, name, parent_id) VALUES (?, ?, ?, ?)').run(id, req.tenantId, name, req.body.parentId || null);
-    res.status(201).json({ id, name });
-  });
-  app.get('/api/brands', auth, allow('catalogue.view', 'catalogue'), (req, res) => {
-    res.json({ items: db.prepare('SELECT * FROM brands WHERE tenant_id = ? ORDER BY name').all(req.tenantId) });
-  });
-  app.post('/api/brands', auth, allow('catalogue.manage', 'catalogue'), (req, res) => {
+    const saved = await store.insert('categories', { company_id: req.companyId, name, parent_id: req.body.parentId || '' });
+    res.status(201).json({ id: saved.id, name });
+  }));
+  app.get('/api/brands', auth, allow('catalogue.view', 'catalogue'), route(async (req, res) => {
+    const items = (await store.find('brands', { company_id: req.companyId })).sort((a, b) => a.name.localeCompare(b.name));
+    res.json({ items });
+  }));
+  app.post('/api/brands', auth, allow('catalogue.manage', 'catalogue'), route(async (req, res) => {
     const name = String(req.body?.name || '').trim();
     if (!name) return fail(res, 400, 'INVALID', 'Enter a brand name.');
-    const id = randomUUID();
-    db.prepare('INSERT INTO brands (id, tenant_id, name) VALUES (?, ?, ?)').run(id, req.tenantId, name);
-    res.status(201).json({ id, name });
-  });
-  app.get('/api/units', auth, allow('catalogue.view', 'catalogue'), (req, res) => {
-    res.json({ items: db.prepare('SELECT * FROM units WHERE tenant_id = ? ORDER BY name').all(req.tenantId) });
-  });
-
-  app.get('/api/products', auth, allow('catalogue.view', 'catalogue'), (req, res) => {
-    const q = String(req.query.q || '').trim().toLowerCase();
-    const products = db.prepare('SELECT * FROM products WHERE tenant_id = ? ORDER BY name').all(req.tenantId);
-    const items = products.filter((product) => !q || product.name.toLowerCase().includes(q)).map((product) => ({
-      ...shapeProduct(db, product),
-    }));
+    const saved = await store.insert('brands', { company_id: req.companyId, name });
+    res.status(201).json({ id: saved.id, name });
+  }));
+  app.get('/api/units', auth, allow('catalogue.view', 'catalogue'), route(async (req, res) => {
+    const items = (await store.find('units', { company_id: req.companyId })).sort((a, b) => a.name.localeCompare(b.name));
     res.json({ items });
-  });
+  }));
 
-  app.post('/api/products', auth, allow('catalogue.manage', 'catalogue'), (req, res) => {
+  app.get('/api/products', auth, allow('catalogue.view', 'catalogue'), route(async (req, res) => {
+    const q = String(req.query.q || '').trim().toLowerCase();
+    const products = (await store.find('products', { company_id: req.companyId })).sort((a, b) => a.name.localeCompare(b.name));
+    const items = [];
+    for (const product of products) {
+      if (q && !product.name.toLowerCase().includes(q)) continue;
+      items.push(await shapeProduct(store, product));
+    }
+    res.json({ items });
+  }));
+
+  app.post('/api/products', auth, allow('catalogue.manage', 'catalogue'), route(async (req, res) => {
     const body = req.body ?? {};
     const name = String(body.name || '').trim();
     const sku = String(body.variant?.sku || '').trim();
     if (name.length < 2 || sku.length < 2) return fail(res, 400, 'INVALID', 'Product name and SKU are required.');
-    if (!db.prepare('SELECT id FROM units WHERE id = ? AND tenant_id = ?').get(body.unitId, req.tenantId)) {
-      return fail(res, 400, 'INVALID', 'Choose a unit.');
-    }
-    const id = randomUUID();
-    const variantId = randomUUID();
-    db.exec('BEGIN');
-    try {
-      db.prepare(`
-        INSERT INTO products (id, tenant_id, name, category_id, brand_id, unit_id, hsn_sac, gst_rate, tracking_type, is_service)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, req.tenantId, name, body.categoryId || null, body.brandId || null, body.unitId, body.hsnSac || null, body.gstRate || '18', body.trackingType || 'none', body.isService ? 1 : 0);
-      db.prepare(`
-        INSERT INTO variants (id, tenant_id, product_id, sku, barcode, mrp, sale_price, cost_price, min_stock)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(variantId, req.tenantId, id, sku, body.variant.barcode || null, money(body.variant.mrp), money(body.variant.salePrice), money(body.variant.costPrice), qty(body.variant.minStock || 0));
-      db.exec('COMMIT');
-    } catch (error) {
-      db.exec('ROLLBACK');
-      if (String(error.message).includes('UNIQUE')) return fail(res, 409, 'SKU', 'That SKU is already used.');
-      throw error;
-    }
-    res.status(201).json(shapeProduct(db, db.prepare('SELECT * FROM products WHERE id = ?').get(id)));
-  });
+    const [unit] = await store.find('units', { id: body.unitId });
+    if (!unit || unit.company_id !== req.companyId) return fail(res, 400, 'INVALID', 'Choose a unit.');
+    const taken = (await store.find('variants', { company_id: req.companyId })).some((row) => row.sku.toLowerCase() === sku.toLowerCase());
+    if (taken) return fail(res, 409, 'SKU', 'That SKU is already used.');
+    const product = await store.insert('products', {
+      company_id: req.companyId,
+      name,
+      category_id: body.categoryId || '',
+      brand_id: body.brandId || '',
+      unit_id: body.unitId,
+      hsn_sac: body.hsnSac || '',
+      gst_rate: body.gstRate || '18',
+      tracking_type: body.trackingType || 'none',
+      is_service: body.isService ? 1 : 0,
+      is_active: 1,
+    });
+    await store.insert('variants', {
+      company_id: req.companyId,
+      product_id: product.id,
+      sku,
+      barcode: body.variant.barcode || '',
+      mrp: money(body.variant.mrp),
+      sale_price: money(body.variant.salePrice),
+      cost_price: money(body.variant.costPrice),
+      min_stock: qty(body.variant.minStock || 0),
+      is_active: 1,
+    });
+    res.status(201).json(await shapeProduct(store, product));
+  }));
 
-  app.patch('/api/products/:id', auth, allow('catalogue.manage', 'catalogue'), (req, res) => {
-    const existing = db.prepare('SELECT * FROM products WHERE id = ? AND tenant_id = ?').get(req.params.id, req.tenantId);
-    if (!existing) return fail(res, 404, 'NOT_FOUND', 'Product not found.');
+  app.patch('/api/products/:id', auth, allow('catalogue.manage', 'catalogue'), route(async (req, res) => {
+    const [existing] = await store.find('products', { id: req.params.id });
+    if (!existing || existing.company_id !== req.companyId) return fail(res, 404, 'NOT_FOUND', 'Product not found.');
     const body = req.body ?? {};
-    db.prepare(`
-      UPDATE products SET name = ?, hsn_sac = ?, gst_rate = ?, tracking_type = ?, is_active = ?
-      WHERE id = ? AND tenant_id = ?
-    `).run(
-      body.name ?? existing.name,
-      body.hsnSac === undefined ? existing.hsn_sac : body.hsnSac || null,
-      body.gstRate ?? existing.gst_rate,
-      body.trackingType ?? existing.tracking_type,
-      body.isActive === undefined ? existing.is_active : body.isActive ? 1 : 0,
-      existing.id,
-      req.tenantId,
-    );
-    res.json(shapeProduct(db, db.prepare('SELECT * FROM products WHERE id = ?').get(existing.id)));
-  });
+    const saved = await store.update('products', existing.id, {
+      name: body.name ?? existing.name,
+      hsn_sac: body.hsnSac === undefined ? existing.hsn_sac : body.hsnSac || '',
+      gst_rate: body.gstRate ?? existing.gst_rate,
+      tracking_type: body.trackingType ?? existing.tracking_type,
+      is_active: body.isActive === undefined ? existing.is_active : body.isActive ? 1 : 0,
+    });
+    res.json(await shapeProduct(store, saved));
+  }));
 
-  app.get('/api/stock', auth, allow('stock.view', 'stock'), (req, res) => {
-    const locations = scopedLocations(db, req.session).filter((row) => row.is_active);
+  app.get('/api/stock', auth, allow('stock.view', 'stock'), route(async (req, res) => {
+    const locations = (await scopedLocations(store, req.session)).filter((row) => on(row.is_active));
     const q = String(req.query.q || '').trim().toLowerCase();
-    const variants = db.prepare(`
-      SELECT v.*, p.name AS product_name, u.code AS unit_code
-      FROM variants v
-      JOIN products p ON p.id = v.product_id
-      JOIN units u ON u.id = p.unit_id
-      WHERE v.tenant_id = ? AND v.is_active = 1 AND p.is_active = 1
-      ORDER BY p.name
-    `).all(req.tenantId).filter((row) => !q || row.product_name.toLowerCase().includes(q) || row.sku.toLowerCase().includes(q));
-    const levels = db.prepare('SELECT * FROM stock_levels WHERE tenant_id = ?').all(req.tenantId);
+    const products = await store.find('products', { company_id: req.companyId });
+    const units = await store.find('units', { company_id: req.companyId });
+    const variants = (await store.find('variants', { company_id: req.companyId })).filter((row) => on(row.is_active));
+    const levels = await store.find('stock_levels', { company_id: req.companyId });
     const items = [];
     for (const variant of variants) {
+      const product = products.find((row) => row.id === variant.product_id);
+      if (!product || !on(product.is_active)) continue;
+      if (q && !product.name.toLowerCase().includes(q) && !variant.sku.toLowerCase().includes(q)) continue;
+      const unit = units.find((row) => row.id === product.unit_id);
       for (const location of locations) {
         const level = levels.find((row) => row.variant_id === variant.id && row.location_id === location.id);
         const onHand = Number(level?.qty_on_hand || 0);
         items.push({
           variantId: variant.id,
           sku: variant.sku,
-          productName: variant.product_name,
-          unitCode: variant.unit_code,
+          productName: product.name,
+          unitCode: unit?.code,
           locationId: location.id,
           locationName: location.name,
           qtyOnHand: qty(onHand),
@@ -383,18 +406,10 @@ export async function createApp(options = {}) {
       }
     }
     res.json({ items });
-  });
+  }));
 
-  app.get('/api/stock/movements', auth, allow('stock.view', 'stock'), (req, res) => {
-    const rows = db.prepare(`
-      SELECT m.*, l.name AS location_name, p.name AS product_name, v.sku
-      FROM stock_movements m
-      JOIN locations l ON l.id = m.location_id
-      JOIN variants v ON v.id = m.variant_id
-      JOIN products p ON p.id = v.product_id
-      WHERE m.tenant_id = ?
-      ORDER BY m.created_at DESC LIMIT 50
-    `).all(req.tenantId).filter((row) => locationAllowed(req.session, row.location_id));
+  app.get('/api/stock/movements', auth, allow('stock.view', 'stock'), route(async (req, res) => {
+    const rows = (await recentMovements(store, req.companyId, 50)).filter((row) => locationAllowed(req.session, row.location_id));
     res.json({
       items: rows.map((row) => ({
         id: row.id,
@@ -408,79 +423,79 @@ export async function createApp(options = {}) {
         productName: row.product_name,
       })),
     });
-  });
+  }));
 
-  app.post('/api/stock/adjustments', auth, allow('stock.adjust', 'stock'), (req, res) => {
+  app.post('/api/stock/adjustments', auth, allow('stock.adjust', 'stock'), route(async (req, res) => {
     const { locationId, variantId, reason, note } = req.body ?? {};
     const delta = Number(req.body?.qtyDelta);
     if (!locationId || !variantId || !Number.isFinite(delta) || delta === 0) {
       return fail(res, 400, 'INVALID', 'Choose an item, a location, and a quantity other than zero.');
     }
     if (!locationAllowed(req.session, locationId)) return fail(res, 403, 'PERMISSION_DENIED', 'That location is outside your access.');
-    if (!db.prepare('SELECT id FROM locations WHERE id = ? AND tenant_id = ? AND is_active = 1').get(locationId, req.tenantId)) {
-      return fail(res, 404, 'NOT_FOUND', 'Location not found.');
+    const [location] = await store.find('locations', { id: locationId });
+    if (!location || location.company_id !== req.companyId || !on(location.is_active)) return fail(res, 404, 'NOT_FOUND', 'Location not found.');
+    const [variant] = await store.find('variants', { id: variantId });
+    if (!variant || variant.company_id !== req.companyId || !on(variant.is_active)) return fail(res, 404, 'NOT_FOUND', 'Variant not found.');
+    const levels = await store.find('stock_levels', { company_id: req.companyId, location_id: locationId, variant_id: variantId });
+    const level = levels[0];
+    const next = Number(level?.qty_on_hand || 0) + delta;
+    if (next < -0.0001) return fail(res, 400, 'NEGATIVE', 'Stock cannot go below zero.');
+    if (level) await store.update('stock_levels', level.id, { qty_on_hand: qty(next) });
+    else {
+      await store.insert('stock_levels', {
+        company_id: req.companyId,
+        location_id: locationId,
+        variant_id: variantId,
+        qty_on_hand: qty(next),
+      });
     }
-    const variant = db.prepare('SELECT * FROM variants WHERE id = ? AND tenant_id = ? AND is_active = 1').get(variantId, req.tenantId);
-    if (!variant) return fail(res, 404, 'NOT_FOUND', 'Variant not found.');
-    db.exec('BEGIN');
-    try {
-      const level = db.prepare('SELECT * FROM stock_levels WHERE tenant_id = ? AND location_id = ? AND variant_id = ?').get(req.tenantId, locationId, variantId);
-      const next = Number(level?.qty_on_hand || 0) + delta;
-      if (next < -0.0001) {
-        db.exec('ROLLBACK');
-        return fail(res, 400, 'NEGATIVE', 'Stock cannot go below zero.');
-      }
-      if (level) {
-        db.prepare('UPDATE stock_levels SET qty_on_hand = ? WHERE id = ?').run(qty(next), level.id);
-      } else {
-        db.prepare('INSERT INTO stock_levels (id, tenant_id, location_id, variant_id, qty_on_hand) VALUES (?, ?, ?, ?, ?)').run(
-          randomUUID(), req.tenantId, locationId, variantId, qty(next),
-        );
-      }
-      const movementId = randomUUID();
-      db.prepare(`
-        INSERT INTO stock_movements (id, tenant_id, location_id, variant_id, qty, movement_type, reason, note, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(movementId, req.tenantId, locationId, variantId, qty(delta), reason === 'opening' ? 'opening' : 'adjustment', reason || 'correction', note || null, new Date().toISOString());
-      db.prepare('INSERT INTO audit_log (id, tenant_id, user_id, action, entity, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-        randomUUID(), req.tenantId, req.session.user.id, 'stock.adjust', 'stock_movement', movementId, new Date().toISOString(),
-      );
-      db.exec('COMMIT');
-      res.status(201).json({ movementId, qtyOnHand: qty(next) });
-    } catch (error) {
-      db.exec('ROLLBACK');
-      throw error;
-    }
-  });
+    const movement = await store.insert('stock_movements', {
+      company_id: req.companyId,
+      location_id: locationId,
+      variant_id: variantId,
+      qty: qty(delta),
+      movement_type: reason === 'opening' ? 'opening' : 'adjustment',
+      reason: reason || 'correction',
+      note: note || '',
+      created_at: new Date().toISOString(),
+    });
+    await store.insert('audit_logs', {
+      company_id: req.companyId,
+      user_id: req.session.user.id,
+      action: 'stock.adjust',
+      entity: 'stock_movement',
+      entity_id: movement.id,
+      created_at: new Date().toISOString(),
+    });
+    res.status(201).json({ movementId: movement.id, qtyOnHand: qty(next) });
+  }));
 
   app.get('/api/settings', auth, allow('settings.view', 'settings'), (req, res) => {
     res.json({ tenant: req.session.tenant, modules: req.session.modules });
   });
 
-  app.patch('/api/settings', auth, allow('settings.manage', 'settings'), (req, res) => {
+  app.patch('/api/settings', auth, allow('settings.manage', 'settings'), route(async (req, res) => {
     const name = String(req.body?.name || req.session.tenant.name).trim();
     if (name.length < 2) return fail(res, 400, 'INVALID', 'Enter the business name.');
-    db.prepare('UPDATE tenants SET name = ?, legal_name = ?, gstin = ? WHERE id = ?').run(
+    await store.update('companies', req.companyId, {
       name,
-      req.body.legalName || null,
-      req.body.gstin || null,
-      req.tenantId,
-    );
-    res.json(loadSession(db, req.session.user.id));
-  });
+      legal_name: req.body.legalName || '',
+      gstin: req.body.gstin || '',
+    });
+    res.json(await loadSession(store, req.session.user.id));
+  }));
 
-  app.patch('/api/settings/modules', auth, allow('settings.manage', 'settings'), (req, res) => {
+  app.patch('/api/settings/modules', auth, allow('settings.manage', 'settings'), route(async (req, res) => {
     const feature = req.body?.feature;
     if (!FEATURE_KEYS.includes(feature)) return fail(res, 400, 'INVALID', 'Unknown module.');
     if (LOCKED_FEATURES.includes(feature)) return fail(res, 400, 'LOCKED', 'Users and settings stay on.');
     const entitled = req.session.modules.find((item) => item.key === feature)?.entitled;
     if (!entitled) return fail(res, 400, 'NOT_ENTITLED', 'This plan does not include that module.');
-    db.prepare(`
-      INSERT INTO tenant_features (tenant_id, feature, enabled) VALUES (?, ?, ?)
-      ON CONFLICT(tenant_id, feature) DO UPDATE SET enabled = excluded.enabled
-    `).run(req.tenantId, feature, req.body.enabled ? 1 : 0);
-    res.json(loadSession(db, req.session.user.id));
-  });
+    const settings = await store.find('settings', { company_id: req.companyId, setting_key: feature });
+    if (settings[0]) await store.update('settings', settings[0].id, { setting_value: req.body.enabled ? '1' : '0' });
+    else await store.insert('settings', { company_id: req.companyId, setting_key: feature, setting_value: req.body.enabled ? '1' : '0' });
+    res.json(await loadSession(store, req.session.user.id));
+  }));
 
   app.get('/api/vertical/:feature/status', auth, (req, res) => {
     const map = { serial: 'serial', warranty: 'warranty', 'bike-service': 'bike_service', purchase: 'purchase', sales: 'sales', customers: 'customers', reports: 'reports', notifications: 'notifications' };
@@ -493,13 +508,12 @@ export async function createApp(options = {}) {
     res.json({ module: feature, available: false });
   });
 
-  if (options.vite === false) {
-    app.use((error, _req, res, _next) => {
-      console.error(error);
-      if (!res.headersSent) fail(res, 500, 'SERVER', 'Something went wrong.');
-    });
-    return { app, db };
-  }
+  app.use((error, _req, res, _next) => {
+    console.error(error);
+    if (!res.headersSent) fail(res, 500, 'SERVER', 'Something went wrong.');
+  });
+
+  if (options.vite === false) return { app, store };
 
   if (process.env.NODE_ENV === 'production' && existsSync(distDir)) {
     app.use(express.static(distDir));
@@ -514,43 +528,54 @@ export async function createApp(options = {}) {
     });
     app.use(vite.middlewares);
   }
-
-  app.use((error, _req, res, _next) => {
-    console.error(error);
-    if (!res.headersSent) fail(res, 500, 'SERVER', 'Something went wrong.');
-  });
-  return { app, db };
+  return { app, store };
 }
 
-function scopedLocations(db, session) {
-  const rows = db.prepare('SELECT * FROM locations WHERE tenant_id = ? ORDER BY name').all(session.tenant.id);
+async function scopedLocations(store, session) {
+  const rows = (await store.find('locations', { company_id: session.tenant.id })).sort((a, b) => a.name.localeCompare(b.name));
   if (!session.user.locationIds.length) return rows;
   return rows.filter((row) => session.user.locationIds.includes(row.id));
 }
 
-function shapeProduct(db, product) {
-  const variants = db.prepare('SELECT * FROM variants WHERE product_id = ? AND tenant_id = ?').all(product.id, product.tenant_id);
-  const category = product.category_id ? db.prepare('SELECT id, name FROM categories WHERE id = ?').get(product.category_id) : null;
-  const brand = product.brand_id ? db.prepare('SELECT id, name FROM brands WHERE id = ?').get(product.brand_id) : null;
-  const unit = db.prepare('SELECT id, code, name FROM units WHERE id = ?').get(product.unit_id);
+async function shapeProduct(store, product) {
+  const variants = await store.find('variants', { product_id: product.id, company_id: product.company_id });
+  const [category] = product.category_id ? await store.find('categories', { id: product.category_id }) : [];
+  const [brand] = product.brand_id ? await store.find('brands', { id: product.brand_id }) : [];
+  const [unit] = await store.find('units', { id: product.unit_id });
   return {
     id: product.id,
     name: product.name,
-    hsnSac: product.hsn_sac,
+    hsnSac: product.hsn_sac || null,
     gstRate: product.gst_rate,
     trackingType: product.tracking_type,
-    isActive: product.is_active === 1,
-    category,
-    brand,
-    unit,
+    isActive: on(product.is_active),
+    category: category ? { id: category.id, name: category.name } : null,
+    brand: brand ? { id: brand.id, name: brand.name } : null,
+    unit: unit ? { id: unit.id, code: unit.code, name: unit.name } : null,
     variants: variants.map((variant) => ({
       id: variant.id,
       sku: variant.sku,
-      barcode: variant.barcode,
-      mrp: variant.mrp,
-      salePrice: variant.sale_price,
-      costPrice: variant.cost_price,
+      barcode: variant.barcode || null,
+      mrp: variant.mrp || null,
+      salePrice: variant.sale_price || null,
+      costPrice: variant.cost_price || null,
       minStock: variant.min_stock,
     })),
   };
+}
+
+async function recentMovements(store, companyId, limit) {
+  const movements = await store.find('stock_movements', { company_id: companyId });
+  const locations = await store.find('locations', { company_id: companyId });
+  const variants = await store.find('variants', { company_id: companyId });
+  const products = await store.find('products', { company_id: companyId });
+  return movements
+    .map((row) => {
+      const location = locations.find((item) => item.id === row.location_id);
+      const variant = variants.find((item) => item.id === row.variant_id);
+      const product = products.find((item) => item.id === variant?.product_id);
+      return { ...row, location_name: location?.name, sku: variant?.sku, product_name: product?.name };
+    })
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .slice(0, limit);
 }

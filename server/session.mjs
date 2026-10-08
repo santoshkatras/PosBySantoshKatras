@@ -1,26 +1,22 @@
 import { LOCKED_FEATURES } from '../shared/domain.mjs';
+import { planByCode } from './provision.mjs';
 
-export function loadSession(db, userId) {
-  const user = db.prepare(`
-    SELECT u.id, u.tenant_id, u.name, u.email, u.status, r.id AS role_id, r.code AS role_code, r.name AS role_name
-    FROM users u JOIN roles r ON r.id = u.role_id
-    WHERE u.id = ?
-  `).get(userId);
+export async function loadSession(store, userId) {
+  const [user] = await store.find('users', { id: userId });
   if (!user || user.status !== 'active') return null;
-  const tenant = db.prepare(`
-    SELECT t.*, p.name AS plan_name, p.locations_limit, p.users_limit
-    FROM tenants t JOIN plans p ON p.code = t.plan_code
-    WHERE t.id = ?
-  `).get(user.tenant_id);
-  if (!tenant || tenant.status === 'suspended' || tenant.status === 'cancelled') return null;
-  const permissions = db.prepare('SELECT permission FROM role_permissions WHERE role_id = ?').all(user.role_id).map((row) => row.permission);
-  const locationIds = db.prepare('SELECT location_id FROM user_locations WHERE user_id = ?').all(user.id).map((row) => row.location_id);
-  const entitled = new Map(db.prepare('SELECT feature, enabled FROM plan_features WHERE plan_code = ?').all(tenant.plan_code).map((row) => [row.feature, row.enabled === 1]));
-  const toggles = new Map(db.prepare('SELECT feature, enabled FROM tenant_features WHERE tenant_id = ?').all(tenant.id).map((row) => [row.feature, row.enabled === 1]));
-  const modules = [...entitled.keys()].map((key) => ({
+  const [role] = await store.find('roles', { id: user.role_id });
+  const [company] = await store.find('companies', { id: user.company_id });
+  if (!role || !company || company.status === 'suspended' || company.status === 'cancelled') return null;
+  const plan = planByCode(company.plan);
+  if (!plan) return null;
+  const rights = await store.find('role_rights', { role_id: role.id });
+  const links = await store.find('user_locations', { user_id: user.id });
+  const settings = await store.find('settings', { company_id: company.id });
+  const toggles = new Map(settings.map((row) => [row.setting_key, row.setting_value === '1' || row.setting_value === 1]));
+  const modules = Object.keys(plan.modules).map((key) => ({
     key,
-    entitled: entitled.get(key),
-    enabled: Boolean(entitled.get(key) && toggles.get(key)),
+    entitled: Boolean(plan.modules[key]),
+    enabled: Boolean(plan.modules[key] && toggles.get(key)),
     locked: LOCKED_FEATURES.includes(key),
   }));
   return {
@@ -29,22 +25,22 @@ export function loadSession(db, userId) {
       name: user.name,
       email: user.email,
       status: user.status,
-      role: { id: user.role_id, code: user.role_code, name: user.role_name },
-      permissions,
-      locationIds,
+      role: { id: role.id, code: role.code, name: role.name },
+      permissions: rights.map((row) => row.permission),
+      locationIds: links.map((row) => row.location_id),
     },
     tenant: {
-      id: tenant.id,
-      name: tenant.name,
-      legalName: tenant.legal_name,
-      businessType: tenant.business_type,
-      gstin: tenant.gstin,
-      stateCode: tenant.state_code,
-      status: tenant.status,
-      trialEndsAt: tenant.trial_ends_at,
-      plan: { code: tenant.plan_code, name: tenant.plan_name },
+      id: company.id,
+      name: company.name,
+      legalName: company.legal_name,
+      businessType: company.business_type,
+      gstin: company.gstin,
+      stateCode: company.state_code,
+      status: company.status,
+      trialEndsAt: company.expires_at,
+      plan: { code: plan.code, name: plan.name },
     },
     modules,
-    limits: { locations: tenant.locations_limit, users: tenant.users_limit },
+    limits: { locations: plan.limits.locations, users: plan.limits.users },
   };
 }

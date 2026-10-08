@@ -1,19 +1,21 @@
 # Stockkeep
 
-Inventory for Indian computer shops and bike service centres. One Node process serves the API and the web app. There is no Docker, Postgres, or Redis. The layout matches TechCizHRMS: a Vite client, an Express server started with `node server/start.mjs`, and a Zoho Catalyst AppSail config for Node 24 on port 9000.
+Inventory for Indian computer shops and bike service centres. One Node process serves the API and the web app. There is no Docker, Postgres, Redis, or SQLite. The layout matches TechCizHRMS: a Vite client, an Express server started with `node server/start.mjs`, Zoho Catalyst AppSail on Node 24 port 9000, and Catalyst Data Store tables.
 
 ## Run it on your computer
 
-You need Node.js 22 or newer.
+You need Node.js 22 or newer, and the Catalyst CLI signed in to the same org.
 
 ```bash
+npm install -g zcatalyst-cli
+catalyst login --dc us
 npm install
 npm run dev
 ```
 
 Open http://127.0.0.1:9000
 
-The first start creates `data/stockkeep.sqlite` and loads two demo businesses. Password for every demo user is `Demo@12345`.
+The server reads and writes the Development Data Store in the Catalyst project PosBySantoshKatras. The first start loads two demo businesses if they are not already there. Password for every demo user is `Demo@12345`.
 
 | Business | Sign in | What you can see |
 | --- | --- | --- |
@@ -64,17 +66,17 @@ catalyst deploy appsail --name posbysantoshkatras -ni
 
 The Development AppSail is already deployed at https://posbysantoshkatras-10135490478.development.catalystappsail.com
 
-`.catalystignore` keeps git metadata and the local SQLite file out of the upload. `node_modules` stays in the package because AppSail starts `node server/start.mjs` directly and does not run `npm install` before the process must listen.
+`.catalystignore` keeps git metadata out of the upload. `node_modules` stays in the package because AppSail starts `node server/start.mjs` directly and does not run `npm install` before the process must listen.
+
+Business data lives in Catalyst Data Store, the same service TechCizHRMS uses. Each table has Catalyst's `ROWID`, plus `row_key`, a numeric `id`, and `company_id` on company-owned rows. The tables are `companies`, `users`, `locations`, `roles`, `role_rights`, `user_locations`, `refresh_tokens`, `units`, `categories`, `brands`, `products`, `variants`, `stock_levels`, `stock_movements`, `audit_logs`, and `settings`. A redeploy does not wipe those rows. The demo seed runs again only when the demo emails are missing.
 
 Set `JWT_SECRET` in `app-config.json` `env_variables` before a real deploy. The development fallback is only for a laptop.
 
-AppSail disk does not survive a redeploy. `data/stockkeep.sqlite` is fine on your computer. On Catalyst, a new deploy can start from an empty database and the demo seed runs again. Move the file to a durable store before you put a real shop on it.
-
 ## How this differs from the first foundation
 
-The first cut used pnpm, Next.js, NestJS, Postgres with row-level security, and Redis. That stack needed Docker. This cut keeps the same product flows and drops that infrastructure so the app runs as a single Node process, the way TechCizHRMS does.
+The first cut used pnpm, Next.js, NestJS, Postgres with row-level security, and Redis. A later cut used a SQLite file so the process could start without Docker. This cut keeps the same product flows and stores rows in Catalyst Data Store, the way TechCizHRMS does.
 
-Tenant isolation is in the queries: every business read and write filters on `tenant_id`. The API ignores a spoofed tenant header and uses the signed-in user. Passwords are scrypt hashes. Access tokens last 15 minutes. The refresh token is an httpOnly cookie named `sk_refresh`.
+Tenant isolation is in the queries: every business read and write filters on `company_id`. The API ignores a spoofed tenant header and uses the signed-in user. Passwords are scrypt hashes. Access tokens last 15 minutes. The refresh token is an httpOnly cookie named `sk_refresh`.
 
 ## Still to build
 

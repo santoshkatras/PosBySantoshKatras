@@ -1,13 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import test from 'node:test';
 import { createApp } from './app.mjs';
 
 async function boot() {
-  const dir = mkdtempSync(join(tmpdir(), 'stockkeep-'));
-  const { app } = await createApp({ dbPath: join(dir, 'test.sqlite'), vite: false });
+  const { app } = await createApp({ store: 'memory', vite: false });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;

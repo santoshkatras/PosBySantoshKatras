@@ -6,8 +6,8 @@ if (process.env.X_ZOHO_CATALYST_LISTEN_PORT) {
 }
 
 const port = Number(process.env.X_ZOHO_CATALYST_LISTEN_PORT || process.env.PORT || 9000);
-const { app, db } = await createApp();
-seedDemos(db);
+const { app, store } = await createApp();
+if (!process.env.X_ZOHO_CATALYST_LISTEN_PORT) await seedDemos(store);
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Stockkeep listening on http://127.0.0.1:${port}`);
 });
