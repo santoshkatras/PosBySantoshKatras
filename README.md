@@ -62,6 +62,10 @@ catalyst serve
 catalyst deploy appsail --name posbysantoshkatras -ni
 ```
 
+The Development AppSail is already deployed at https://posbysantoshkatras-10135490478.development.catalystappsail.com
+
+`.catalystignore` keeps git metadata and the local SQLite file out of the upload. `node_modules` stays in the package because AppSail starts `node server/start.mjs` directly and does not run `npm install` before the process must listen.
+
 Set `JWT_SECRET` in `app-config.json` `env_variables` before a real deploy. The development fallback is only for a laptop.
 
 AppSail disk does not survive a redeploy. `data/stockkeep.sqlite` is fine on your computer. On Catalyst, a new deploy can start from an empty database and the demo seed runs again. Move the file to a durable store before you put a real shop on it.
