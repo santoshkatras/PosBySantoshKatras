@@ -36,15 +36,16 @@ Money is INR. Product rows carry HSN/SAC and a GST rate. Stock cannot go below z
 
 This is an AppSail service, not a Catalyst function and not a Slate site. Do not deploy it into the existing TechCizHRMS or TechCizHRMS2 AppSail. That service is already running HRMS.
 
-1. In the [US Catalyst console](https://console.catalyst.zoho.com/baas/941422719/index) (org `skatras632`, id `941422719`), create a **new** project. Stay in Development.
-2. From this folder, link that project. Replace the project id with the one from the console:
+1. The Catalyst project is already created: **PosBySantoshKatras**, id `82924000000039365`, in org `skatras632` (`941422719`), Development, timezone Asia/Kolkata. Console: https://console.catalyst.zoho.com/baas/941422719/index
+2. From this folder, link that project:
 
 ```bash
 npm install -g zcatalyst-cli
-catalyst init --org 941422719 -p <newProjectId> -ni
+catalyst login --dc us -ni
+catalyst init --org 941422719 -p 82924000000039365 -ni
 ```
 
-3. Add an AppSail service named `stockkeep`. The CLI writes `catalyst.json`. Keep these values, which already match `app-config.json` and the live HRMS service:
+3. Add an AppSail service named `posbysantoshkatras`. The CLI writes `catalyst.json`. Keep these values, which already match `app-config.json` and the live HRMS service:
 
 - Startup command: `node server/start.mjs`
 - Stack: `node24`
@@ -58,7 +59,7 @@ catalyst init --org 941422719 -p <newProjectId> -ni
 ```bash
 npm test
 catalyst serve
-catalyst deploy appsail --name stockkeep -ni
+catalyst deploy appsail --name posbysantoshkatras -ni
 ```
 
 Set `JWT_SECRET` in `app-config.json` `env_variables` before a real deploy. The development fallback is only for a laptop.
