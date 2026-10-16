@@ -1,15 +1,51 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  ADJUSTMENT_REASONS,
   COPY,
-  GST_RATES,
   STATES,
   findMenuPage,
   stateName,
 } from '../../shared/domain.mjs';
 import { ApiError } from './api.js';
+import { useFitHeight } from './fit-height.js';
 import { useAuth } from './auth.jsx';
+import { ItemList } from './item-list.jsx';
+import { ItemMaster } from './item-master.jsx';
+import { RecordDesk } from './record-desk.jsx';
+import { SerialStockWindow, StockEntryWindow } from './stock-entry.jsx';
+import { OpeningEntryWindow } from './opening-stock.jsx';
+import { PriceListPage } from './price-list.jsx';
+import { InventoryDashboard } from './dashboard.jsx';
+import { PriceUpdatePage } from './price-update.jsx';
+import { DocumentsPage } from './documents.jsx';
+import { PurchaseConfigPage } from './purchase-config.jsx';
+import { DisplaySettingsPage } from './display-settings.jsx';
+import { ShortcutSettingsPage } from './shortcut-settings.jsx';
+import { TenderSettingsPage } from './tender-settings.jsx';
+import { CouponsPage, OffersPage } from './promotions.jsx';
+import { LoyaltyPage, VouchersPage } from './promo-wallet.jsx';
+import { TransferApprovalsPage, TransferListPage } from './transfers.jsx';
+import { TransferConfigPage } from './transfer-config.jsx';
+import { WastagePage } from './wastage.jsx';
+import { DataMigrationPage } from './data-migration.jsx';
+import { StockConfigPage } from './stock-config.jsx';
+import { DataCleanupPage } from './data-cleanup.jsx';
+import { BarcodePrintPage } from './barcode-print.jsx';
+import { StockAnalysisPage } from './stock-analysis.jsx';
+import { OrgStructurePage } from './org-structure.jsx';
+import { WarrantyPage } from './warranty.jsx';
+import { UnitConversionPage } from './unit-conversion.jsx';
+import { RepackPage } from './repack.jsx';
+import { PrintTemplatesPage } from './print-templates.jsx';
+import { SERIAL_FIELDS, SERIAL_LABELS } from './stock-grids.jsx';
+
+const CATEGORY_LEVELS = Array.from({ length: 15 }, (_, index) => String(index + 1));
+const DEFAULT_LABELS = Object.fromEntries(CATEGORY_LEVELS.map((level) => [level, level === '1' ? 'Item Type' : `Category ${level}`]));
+const DEFAULT_VISIBLE = Object.fromEntries(CATEGORY_LEVELS.map((level) => [level, Number(level) <= 5]));
+
+function categoryName(labels, level) {
+  return labels?.[level] || labels?.[String(level)] || `Category ${level}`;
+}
 
 const FEATURES = {
   purchase: { key: 'purchase', title: 'Purchase', body: 'Suppliers, purchase orders, and goods receipt notes will land here. Receipts will write the same stock ledger you already use.' },
@@ -31,7 +67,7 @@ const DOC_LABELS = {
 const LABELS = {
   catalogue: 'Catalogue', stock: 'Stock', purchase: 'Purchase', sales: 'Sales', customers: 'Customers',
   reports: 'Reports', users: 'Users', settings: 'Settings', notifications: 'Notifications',
-  serial: 'Serial numbers', warranty: 'Warranty', bike_service: 'Job cards',
+  serial: 'Serial numbers', warranty: 'Warranty', bike_service: 'Vehicle service',
 };
 
 function money(value) {
@@ -47,10 +83,10 @@ function message(error) {
   return error instanceof ApiError ? error.message : 'Something went wrong. Try again.';
 }
 
-function Modal({ title, onClose, children }) {
+function Modal({ title, onClose, wide, children }) {
   return (
     <div className="modal-back" onClick={onClose}>
-      <div className="modal-card" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
+      <div className={wide ? 'modal-card matrix-modal' : 'modal-card'} role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
         <div className="card-head">
           <h2>{title}</h2>
           <button type="button" className="btn" onClick={onClose}>Close</button>
@@ -87,7 +123,6 @@ export function LoginPage() {
     <div className="auth login-stage">
       <div className="login-shell">
         <form className="login-panel" onSubmit={submit}>
-          <div className="sk-mark" aria-hidden="true">SK</div>
           <div className="login-brand">{COPY.app}</div>
           <div className="login-heading">
             <h2>{COPY.loginTitle}</h2>
@@ -103,7 +138,7 @@ export function LoginPage() {
           <button className="login-submit" type="submit" disabled={pending}>{pending ? 'Signing in…' : 'Sign in'}</button>
           <Link className="login-trial" to="/signup">Create a business</Link>
           <p className="login-note">{COPY.demoHint}</p>
-          <div className="choice-row">
+          <div className="choice-row demo-row">
             <button type="button" className="choice" onClick={() => { setEmail('owner@bytebazaar.demo'); setPassword('Demo@12345'); }}>{COPY.computer}</button>
             <button type="button" className="choice" onClick={() => { setEmail('owner@spoke.demo'); setPassword('Demo@12345'); }}>{COPY.bike}</button>
           </div>
@@ -162,7 +197,7 @@ export function SignupPage() {
           <div className="auth-stack">
             <div className="choice-row">
               <button type="button" className={form.businessType === 'computer_shop' ? 'choice on' : 'choice'} onClick={() => setForm((current) => ({ ...current, businessType: 'computer_shop' }))}>Computer shop</button>
-              <button type="button" className={form.businessType === 'bike_service' ? 'choice on' : 'choice'} onClick={() => setForm((current) => ({ ...current, businessType: 'bike_service' }))}>Bike service</button>
+              <button type="button" className={form.businessType === 'bike_service' ? 'choice on' : 'choice'} onClick={() => setForm((current) => ({ ...current, businessType: 'bike_service' }))}>Car &amp; bike service</button>
             </div>
             <label>Your name<input required value={form.ownerName} onChange={set('ownerName')} /></label>
             <label>Business name<input required value={form.businessName} onChange={set('businessName')} /></label>
@@ -196,6 +231,10 @@ export function SignupPage() {
 }
 
 export function DashboardPage() {
+  return <InventoryDashboard fallback={<BasicDashboard />} />;
+}
+
+function BasicDashboard() {
   const { session, request } = useAuth();
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState('');
@@ -279,270 +318,166 @@ export function CataloguePage() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
-  const [units, setUnits] = useState([]);
-  const [query, setQuery] = useState('');
+  const [labels, setLabels] = useState(DEFAULT_LABELS);
   const [error, setError] = useState('');
-  const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [draft, setDraft] = useState(blankProduct());
-  const [categoryName, setCategoryName] = useState('');
-  const [brandName, setBrandName] = useState('');
+  const [creator, setCreator] = useState(false);
+  const [masterName, setMasterName] = useState('');
+  const [masterType, setMasterType] = useState('1');
+  const [masterError, setMasterError] = useState('');
 
-  async function load(search = query) {
-    const [productData, categoryData, brandData, unitData] = await Promise.all([
-      request(`/products${search ? `?q=${encodeURIComponent(search)}` : ''}`),
+  async function load() {
+    const [productData, categoryData, brandData, labelData] = await Promise.all([
+      request('/products'),
       request('/categories'),
       request('/brands'),
-      request('/units'),
+      request('/catalogue/labels').catch(() => ({ labels: DEFAULT_LABELS })),
     ]);
     setProducts(productData.items);
     setCategories(categoryData.items);
     setBrands(brandData.items);
-    setUnits(unitData.items);
+    if (labelData.labels) setLabels({ ...DEFAULT_LABELS, ...labelData.labels });
   }
 
   useEffect(() => {
-    load('').catch((err) => setError(message(err)));
+    load().catch((err) => setError(message(err)));
   }, []);
 
-  async function saveProduct(event) {
+  async function addMaster(event) {
     event.preventDefault();
-    setPending(true);
-    setFormError('');
+    setMasterError('');
     try {
-      await request('/products', {
-        method: 'POST',
-        body: {
-          name: draft.name,
-          categoryId: draft.categoryId || null,
-          brandId: draft.brandId || null,
-          unitId: draft.unitId,
-          hsnSac: draft.hsnSac,
-          gstRate: draft.gstRate,
-          trackingType: draft.trackingType,
-          isService: draft.isService,
-          variant: {
-            sku: draft.sku,
-            barcode: draft.barcode,
-            mrp: draft.mrp,
-            salePrice: draft.salePrice,
-            costPrice: draft.costPrice,
-            minStock: draft.minStock || '0',
-          },
-        },
-      });
-      setOpen(false);
-      setDraft(blankProduct(units[0]?.id));
+      if (masterType === 'brand') await request('/brands', { method: 'POST', body: { name: masterName } });
+      else await request('/categories', { method: 'POST', body: { name: masterName, level: masterType } });
+      setMasterName('');
+      setCreator(false);
       await load();
     } catch (err) {
-      setFormError(message(err));
-    } finally {
-      setPending(false);
+      setMasterError(message(err));
     }
   }
 
-  async function addCategory(event) {
-    event.preventDefault();
-    try {
-      await request('/categories', { method: 'POST', body: { name: categoryName } });
-      setCategoryName('');
-      await load();
-    } catch (err) {
-      setError(message(err));
-    }
-  }
-
-  async function addBrand(event) {
-    event.preventDefault();
-    try {
-      await request('/brands', { method: 'POST', body: { name: brandName } });
-      setBrandName('');
-      await load();
-    } catch (err) {
-      setError(message(err));
-    }
+  if ((params.get('compose') === '1' || params.get('edit')) && can('catalogue.manage')) {
+    return (
+      <ItemMaster
+        key={params.get('edit') || 'new'}
+        editId={params.get('edit') || ''}
+        onClose={() => setParams(tab === 'products' ? {} : { tab }, { replace: true })}
+        onSaved={async () => {
+          setParams(tab === 'products' ? {} : { tab }, { replace: true });
+          await load();
+        }}
+      />
+    );
   }
 
   return (
     <>
-      <div className="int-tabs">
-        {[['products', 'Product'], ['categories', 'Category & Brands']].map(([item, label]) => (
-          <button key={item} type="button" className={tab === item ? 'on' : undefined} onClick={() => setTab(item)}>{label}</button>
-        ))}
-      </div>
       {error ? <p className="banner">{error}</p> : null}
       {tab === 'products' ? (
-        <section className="data-grid">
-          <div className="grid-toolbar">
-            <h2 className="grid-title">Product</h2>
-            <form className="grid-search" onSubmit={(event) => { event.preventDefault(); load().catch((err) => setError(message(err))); }}>
-              <input value={query} placeholder="Search products" onChange={(event) => setQuery(event.target.value)} />
-            </form>
-            <div className="grid-tools">
-              {can('catalogue.manage') ? <button type="button" className="btn primary" onClick={() => { setDraft(blankProduct(units[0]?.id)); setOpen(true); }}>Add product</button> : null}
-            </div>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Product</th><th>SKU</th><th>HSN/SAC</th><th>GST</th><th>MRP</th><th>Min</th></tr></thead>
-              <tbody>
-                {products.length ? products.map((product) => (
-                  <tr key={product.id}>
-                    <td>{product.name}<div className="muted">{product.brand?.name || 'No brand'} · {product.category?.name || 'Uncategorised'}</div></td>
-                    <td>{product.variants[0]?.sku}</td>
-                    <td>{product.hsnSac || '—'}</td>
-                    <td>{product.gstRate}%</td>
-                    <td>{product.variants[0]?.mrp ? money(product.variants[0].mrp) : '—'}</td>
-                    <td>{product.variants[0]?.minStock}</td>
-                  </tr>
-                )) : <tr><td className="empty" colSpan={6}>No products yet. Add the first SKU for this counter.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <ItemList
+          products={products}
+          categories={categories}
+          brands={brands}
+          labels={labels}
+          onAdd={() => setParams({ compose: '1' })}
+          onEdit={(id) => setParams({ edit: id })}
+          onCategories={() => setTab('categories')}
+          onReload={() => load().catch((err) => setError(message(err)))}
+        />
       ) : null}
       {tab === 'categories' ? (
-        <>
-          <section className="card">
-            <h2>Categories</h2>
-            {can('catalogue.manage') ? (
-              <form className="filters" onSubmit={addCategory}>
-                <label>Name<input required value={categoryName} onChange={(event) => setCategoryName(event.target.value)} /></label>
-                <button className="btn primary" type="submit">Add category</button>
-              </form>
-            ) : null}
-            <ul className="dept-list">{categories.map((item) => <li key={item.id}><span>{item.name}</span><span className="muted">{item.parent_id ? 'Child' : 'Top level'}</span></li>)}</ul>
-          </section>
-          <section className="card">
-            <h2>Brands</h2>
-            {can('catalogue.manage') ? (
-              <form className="filters" onSubmit={addBrand}>
-                <label>Name<input required value={brandName} onChange={(event) => setBrandName(event.target.value)} /></label>
-                <button className="btn primary" type="submit">Add brand</button>
-              </form>
-            ) : null}
-            <ul className="dept-list">{brands.map((item) => <li key={item.id}><span>{item.name}</span></li>)}</ul>
-          </section>
-        </>
+        <RecordDesk
+          title="Category & Brands"
+          subtitle="Manage categories and brands for the catalogue"
+          columns={[{ id: 'type', label: 'Type' }, { id: 'name', label: 'Name' }, { id: 'status', label: 'Status' }]}
+          filters={[{ id: 'type', label: 'Type', options: [['all', 'All'], ...CATEGORY_LEVELS.map((level) => [categoryName(labels, level), categoryName(labels, level)]), ['Brand', 'Brand']] }]}
+          rows={[
+            ...categories.map((item) => {
+              const type = categoryName(labels, item.level || '1');
+              return {
+                id: `category-${item.id}`,
+                values: { type, name: item.name, status: 'Active' },
+                sections: [
+                  { title: 'General', rows: [['Type', type], ['Name', item.name]] },
+                  { title: 'Additional', rows: [['Shows on', `Product ${type}`], ['Status', 'Active']] },
+                ],
+              };
+            }),
+            ...brands.map((item) => ({
+              id: `brand-${item.id}`,
+              values: { type: 'Brand', name: item.name, status: 'Active' },
+              sections: [
+                { title: 'General', rows: [['Type', 'Brand'], ['Name', item.name]] },
+                { title: 'Additional', rows: [['Shows on', 'Product Brand'], ['Status', 'Active']] },
+              ],
+            })),
+          ]}
+          addLabel="Add new"
+          onAdd={can('catalogue.manage') ? () => { setMasterError(''); setCreator(true); } : undefined}
+          empty="No categories or brands yet."
+        />
       ) : null}
-      {open ? (
-        <Modal title="New product" onClose={() => setOpen(false)}>
-          <form className="stack" onSubmit={saveProduct}>
-            <div className="form-grid">
-              <label className="span">Name<input required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
-              <label>SKU<input required value={draft.sku} onChange={(event) => setDraft({ ...draft, sku: event.target.value })} /></label>
-              <label>Barcode<input value={draft.barcode} onChange={(event) => setDraft({ ...draft, barcode: event.target.value })} /></label>
-              <label>Category
-                <select value={draft.categoryId} onChange={(event) => setDraft({ ...draft, categoryId: event.target.value })}>
-                  <option value="">None</option>
-                  {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-              <label>Brand
-                <select value={draft.brandId} onChange={(event) => setDraft({ ...draft, brandId: event.target.value })}>
-                  <option value="">None</option>
-                  {brands.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-              <label>Unit
-                <select required value={draft.unitId} onChange={(event) => setDraft({ ...draft, unitId: event.target.value })}>
-                  <option value="">Choose</option>
-                  {units.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-              <label>HSN / SAC<input value={draft.hsnSac} onChange={(event) => setDraft({ ...draft, hsnSac: event.target.value })} /></label>
-              <label>GST %
-                <select value={draft.gstRate} onChange={(event) => setDraft({ ...draft, gstRate: event.target.value })}>
-                  {GST_RATES.map((rate) => <option key={rate} value={rate}>{rate}</option>)}
-                </select>
-              </label>
-              <label>Tracking
-                <select value={draft.trackingType} onChange={(event) => setDraft({ ...draft, trackingType: event.target.value })}>
-                  <option value="none">None</option>
-                  <option value="serial">Serial</option>
-                  <option value="batch">Batch</option>
-                </select>
-              </label>
-              <label>MRP<input value={draft.mrp} onChange={(event) => setDraft({ ...draft, mrp: event.target.value })} /></label>
-              <label>Sale price<input value={draft.salePrice} onChange={(event) => setDraft({ ...draft, salePrice: event.target.value })} /></label>
-              <label>Cost<input value={draft.costPrice} onChange={(event) => setDraft({ ...draft, costPrice: event.target.value })} /></label>
-              <label>Minimum stock<input value={draft.minStock} onChange={(event) => setDraft({ ...draft, minStock: event.target.value })} /></label>
+      {creator ? (
+        <div className="modal-back" onClick={() => setCreator(false)}>
+          <form className="modal-card confirm-card" onClick={(event) => event.stopPropagation()} onSubmit={addMaster}>
+            <h2>Add new</h2>
+            <label>Name
+              <input required value={masterName} onChange={(event) => setMasterName(event.target.value)} />
+            </label>
+            <label>Type
+              <select value={masterType} onChange={(event) => setMasterType(event.target.value)}>
+                {CATEGORY_LEVELS.map((level) => <option key={level} value={level}>{categoryName(labels, level)}</option>)}
+              </select>
+            </label>
+            {masterError ? <p className="form-error">{masterError}</p> : null}
+            <div className="actions">
+              <button type="button" className="btn" onClick={() => setCreator(false)}>Cancel</button>
+              <button className="btn primary" type="submit">Save</button>
             </div>
-            <label className="check-row"><input type="checkbox" checked={draft.isService} onChange={(event) => setDraft({ ...draft, isService: event.target.checked })} /> This is a service, not goods</label>
-            {formError ? <p className="form-error">{formError}</p> : null}
-            <button className="btn primary" type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save product'}</button>
           </form>
-        </Modal>
+        </div>
       ) : null}
     </>
   );
-}
-
-function blankProduct(unitId = '') {
-  return { name: '', sku: '', barcode: '', categoryId: '', brandId: '', unitId, hsnSac: '', gstRate: '18', trackingType: 'none', isService: false, mrp: '', salePrice: '', costPrice: '', minStock: '0' };
 }
 
 export function StockPage() {
   const { request, can } = useAuth();
   const [params] = useSearchParams();
   const mode = params.get('mode');
-  const stockTitle = mode === 'opening' ? 'Opening Stock Entry' : mode === 'update' ? 'Stock Update' : 'Stock';
+  const stockTitle = 'Stock Update';
   const [rows, setRows] = useState([]);
-  const [movements, setMovements] = useState([]);
   const [query, setQuery] = useState('');
   const [locationId, setLocationId] = useState('');
   const [error, setError] = useState('');
-  const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [form, setForm] = useState({ variantId: '', locationId: '', qtyDelta: '', reason: mode === 'opening' ? 'opening' : 'correction', note: '' });
-
-  useEffect(() => {
-    setForm((current) => ({ ...current, reason: mode === 'opening' ? 'opening' : 'correction' }));
-  }, [mode]);
+  const [entry, setEntry] = useState(null);
+  const [serialView, setSerialView] = useState(null);
+  const [opening, setOpening] = useState(false);
 
   async function load(search = query) {
-    const [stock, ledger] = await Promise.all([
-      request(`/stock${search ? `?q=${encodeURIComponent(search)}` : ''}`),
-      request('/stock/movements'),
-    ]);
+    const stock = await request(`/stock${search ? `?q=${encodeURIComponent(search)}` : ''}`);
     setRows(stock.items);
-    setMovements(ledger.items);
   }
 
   useEffect(() => { load('').catch((err) => setError(message(err))); }, []);
 
+  // Opening Stock Entry / Stock Update open the entry window straight away.
+  useEffect(() => {
+    if (mode === 'update' && can('stock.adjust')) setEntry({ mode, key: '' });
+    else setEntry(null);
+  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const locations = useMemo(() => {
     const map = new Map();
     for (const row of rows) map.set(row.locationId, row.locationName);
-    return [...map];
-  }, [rows]);
-  const variants = useMemo(() => {
-    const map = new Map();
-    for (const row of rows) map.set(row.variantId, `${row.productName} · ${row.sku}`);
-    return [...map];
+    return [...map].sort((a, b) => String(a[1]).localeCompare(String(b[1])));
   }, [rows]);
   const visible = rows.filter((row) => !locationId || row.locationId === locationId);
-
-  async function adjust(event) {
-    event.preventDefault();
-    setPending(true);
-    setFormError('');
-    try {
-      await request('/stock/adjustments', { method: 'POST', body: { ...form, qtyDelta: Number(form.qtyDelta) } });
-      setOpen(false);
-      setForm({ variantId: '', locationId: '', qtyDelta: '', reason: mode === 'opening' ? 'opening' : 'correction', note: '' });
-      await load();
-    } catch (err) {
-      setFormError(message(err));
-    } finally {
-      setPending(false);
-    }
-  }
+  const splitRef = useRef(null);
+  useFitHeight(splitRef);
 
   return (
-    <>
+    <div ref={splitRef} className="fit-split">
       {error ? <p className="banner">{error}</p> : null}
       <section className="data-grid">
         <div className="grid-toolbar">
@@ -555,74 +490,49 @@ export function StockPage() {
               <option value="">All locations</option>
               {locations.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
             </select>
-            {can('stock.adjust') ? <button type="button" className="btn primary" onClick={() => setOpen(true)}>Adjust</button> : null}
+            {can('stock.adjust') ? (
+              <>
+                <button type="button" className="btn" onClick={() => setOpening(true)}>Opening stock</button>
+                <button type="button" className="btn primary" onClick={() => setEntry({ mode: 'update', key: '' })}>Stock update</button>
+              </>
+            ) : null}
           </div>
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Item</th><th>Location</th><th>On hand</th><th>Min</th><th>Value</th></tr></thead>
+            <thead><tr><th>Item</th><th>Location</th><th>On hand</th><th>Min</th><th>Value</th><th /></tr></thead>
             <tbody>
               {visible.length ? visible.map((row) => (
                 <tr key={`${row.variantId}-${row.locationId}`}>
-                  <td>{row.productName}<div className="muted">{row.sku}</div></td>
+                  <td>{row.productName}<div className="muted">{row.sku}{row.trackingType === 'serial' ? ' · serial nos.' : ''}</div></td>
                   <td>{row.locationName}</td>
                   <td>{row.qtyOnHand} {row.unitCode} {row.low ? <span className="badge late">Low</span> : null}</td>
                   <td>{row.minStock}</td>
                   <td>{row.stockValue ? money(row.stockValue) : '—'}</td>
+                  <td className="row-actions">
+                    {row.trackingType === 'serial' ? <button type="button" className="btn" onClick={() => setSerialView({ variantId: row.variantId, title: row.productName })}>Serials</button> : null}
+                    {can('stock.adjust') ? <button type="button" className="btn" onClick={() => setEntry({ mode: 'update', key: `v:${row.variantId}` })}>Update</button> : null}
+                  </td>
                 </tr>
-              )) : <tr><td className="empty" colSpan={5}>No stock rows for this search.</td></tr>}
+              )) : <tr><td className="empty" colSpan={6}>No stock rows for this search.</td></tr>}
             </tbody>
           </table>
         </div>
+        <div className="grid-foot">Total rows: <strong>{visible.length}</strong><em>On hand {visible.reduce((sum, row) => sum + Number(row.qtyOnHand || 0), 0)}</em><em>Value {money(visible.reduce((sum, row) => sum + Number(row.stockValue || 0), 0))}</em></div>
       </section>
-      <section className="data-grid">
-        <div className="grid-toolbar"><h2 className="grid-title">Ledger</h2></div>
-        <div className="table-wrap">
-          <table>
-            <thead><tr><th>When</th><th>Item</th><th>Location</th><th>Qty</th><th>Reason</th><th>Note</th></tr></thead>
-            <tbody>
-              {movements.length ? movements.map((row) => (
-                <tr key={row.id}>
-                  <td>{when(row.createdAt)}</td>
-                  <td>{row.productName}</td>
-                  <td>{row.location.name}</td>
-                  <td>{row.qty}</td>
-                  <td>{row.reason || row.movementType}</td>
-                  <td>{row.note || '—'}</td>
-                </tr>
-              )) : <tr><td className="empty" colSpan={6}>The ledger is empty.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </section>
-      {open ? (
-        <Modal title="Adjust stock" onClose={() => setOpen(false)}>
-          <form className="stack" onSubmit={adjust}>
-            <label>Item
-              <select required value={form.variantId} onChange={(event) => setForm({ ...form, variantId: event.target.value })}>
-                <option value="">Choose</option>
-                {variants.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-              </select>
-            </label>
-            <label>Location
-              <select required value={form.locationId} onChange={(event) => setForm({ ...form, locationId: event.target.value })}>
-                <option value="">Choose</option>
-                {locations.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-              </select>
-            </label>
-            <label>Quantity change<input required placeholder="+2 or -1" value={form.qtyDelta} onChange={(event) => setForm({ ...form, qtyDelta: event.target.value })} /></label>
-            <label>Reason
-              <select value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })}>
-                {ADJUSTMENT_REASONS.map((reason) => <option key={reason} value={reason}>{reason.replace('_', ' ')}</option>)}
-              </select>
-            </label>
-            <label>Note<textarea value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label>
-            {formError ? <p className="form-error">{formError}</p> : null}
-            <button className="btn primary" type="submit" disabled={pending}>{pending ? 'Saving…' : 'Post adjustment'}</button>
-          </form>
-        </Modal>
+      {entry ? (
+        <StockEntryWindow
+          mode={entry.mode}
+          initialKey={entry.key}
+          rows={rows}
+          locations={locations}
+          onClose={() => setEntry(null)}
+          onDone={async () => { setEntry(null); await load(); }}
+        />
       ) : null}
-    </>
+      {opening ? <OpeningEntryWindow onClose={() => setOpening(false)} onSaved={async () => { setOpening(false); await load(); }} /> : null}
+      {serialView ? <SerialStockWindow variantId={serialView.variantId} title={serialView.title} onClose={() => setSerialView(null)} /> : null}
+    </div>
   );
 }
 
@@ -839,13 +749,35 @@ export function UsersPage() {
 export function SettingsPage() {
   const { session, request, can, refreshSession } = useAuth();
   const [params] = useSearchParams();
-  const section = params.get('section') === 'gst' ? 'gst' : 'master';
+  const section = params.get('section') === 'gst' ? 'gst' : params.get('section') === 'category' ? 'category' : 'master';
   const [name, setName] = useState(session.tenant.name);
   const [legalName, setLegalName] = useState(session.tenant.legalName || '');
   const [gstin, setGstin] = useState(session.tenant.gstin || '');
+  const [labels, setLabels] = useState(DEFAULT_LABELS);
+  const [visible, setVisible] = useState(DEFAULT_VISIBLE);
+  const [autoCreate, setAutoCreate] = useState(false);
+  const [serialLabels, setSerialLabels] = useState(SERIAL_LABELS);
+  const [serialVisible, setSerialVisible] = useState({ serial1: true, serial2: true, attr1: true, attr2: true, attr3: true });
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    if (section !== 'category') return;
+    let live = true;
+    request('/catalogue/labels').then((data) => {
+      if (live && data.labels) setLabels({ ...DEFAULT_LABELS, ...data.labels });
+      if (live && data.visible) setVisible({ ...DEFAULT_VISIBLE, ...data.visible });
+      if (live) setAutoCreate(Boolean(data.autoCreate));
+      if (live && data.serialLabels) setSerialLabels({ ...SERIAL_LABELS, ...data.serialLabels });
+      if (live && data.serialVisible) setSerialVisible((current) => ({ ...current, ...data.serialVisible, serial1: true }));
+    }).catch((err) => {
+      if (live) setError(message(err));
+    });
+    return () => {
+      live = false;
+    };
+  }, [request, section]);
 
   async function save(event) {
     event.preventDefault();
@@ -856,6 +788,59 @@ export function SettingsPage() {
       await request('/settings', { method: 'PATCH', body: { name, legalName, gstin } });
       await refreshSession();
       setSaved('Business profile saved.');
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function saveLabels(event) {
+    event.preventDefault();
+    setPending(true);
+    setError('');
+    setSaved('');
+    const next = Object.fromEntries(CATEGORY_LEVELS.map((level) => [level, String(labels[level] || '').trim() || `Category ${level}`]));
+    const shown = Object.fromEntries(CATEGORY_LEVELS.map((level) => [level, Boolean(visible[level])]));
+    try {
+      const data = await request('/catalogue/labels', { method: 'PATCH', body: { labels: next, visible: shown } });
+      if (data.labels) setLabels({ ...DEFAULT_LABELS, ...data.labels });
+      if (data.visible) setVisible({ ...DEFAULT_VISIBLE, ...data.visible });
+      setSaved('Category configuration saved. Only ticked categories show on the product form.');
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function saveSerialFields(event) {
+    event.preventDefault();
+    setPending(true);
+    setError('');
+    setSaved('');
+    const names = Object.fromEntries(SERIAL_FIELDS.map((key) => [key, String(serialLabels[key] || '').trim() || SERIAL_LABELS[key]]));
+    try {
+      const data = await request('/catalogue/labels', { method: 'PATCH', body: { serialLabels: names, serialVisible: { ...serialVisible, serial1: true } } });
+      if (data.serialLabels) setSerialLabels({ ...SERIAL_LABELS, ...data.serialLabels });
+      if (data.serialVisible) setSerialVisible({ ...data.serialVisible, serial1: true });
+      setSaved('Serial number fields saved. Only ticked fields show in the serial number grid.');
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function saveAutoCreate(event) {
+    event.preventDefault();
+    setPending(true);
+    setError('');
+    setSaved('');
+    try {
+      const data = await request('/catalogue/labels', { method: 'PATCH', body: { autoCreate } });
+      setAutoCreate(Boolean(data.autoCreate));
+      setSaved(autoCreate ? 'New category names typed on a product will be saved in Category & Brands.' : 'Automatic category create is off.');
     } catch (err) {
       setError(message(err));
     } finally {
@@ -877,13 +862,13 @@ export function SettingsPage() {
     <>
       <div className="wf-head">
         <div>
-          <h1>{section === 'gst' ? 'GST Setups' : 'Master Configurations'}</h1>
+          <h1>{section === 'gst' ? 'GST Setups' : section === 'category' ? 'Main Category Setups' : 'Master Configurations'}</h1>
           <p>{session.tenant.plan.name} · {stateName(session.tenant.stateCode)}</p>
         </div>
       </div>
       {error ? <p className="banner">{error}</p> : null}
       {saved ? <p className="saved-note">{saved}</p> : null}
-      <section className="card">
+      {section === 'category' ? null : <section className="card">
         <h2>Business</h2>
         <form className="form-grid" onSubmit={save}>
           <label>Display name<input value={name} onChange={(event) => setName(event.target.value)} disabled={!can('settings.manage')} /></label>
@@ -891,7 +876,77 @@ export function SettingsPage() {
           <label>GSTIN<input value={gstin} onChange={(event) => setGstin(event.target.value.toUpperCase())} disabled={!can('settings.manage')} /></label>
           <div className="actions"><button className="btn primary" type="submit" disabled={pending || !can('settings.manage')}>Save</button></div>
         </form>
-      </section>
+      </section>}
+      {section === 'category' ? (
+        <section className="card">
+          <h2>Category configuration</h2>
+          <p className="muted">Tick a category to show it on the item master. The name you type is the label on the product form.</p>
+          <form className="form-grid" onSubmit={saveLabels}>
+            {CATEGORY_LEVELS.map((level) => (
+              <label key={level}>
+                <span className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={level === '1' ? true : Boolean(visible[level])}
+                    disabled={!can('settings.manage') || level === '1'}
+                    onChange={(event) => setVisible({ ...visible, [level]: event.target.checked })}
+                  />
+                  Category {level}{level === '1' ? <em className="fixed-tag">Compulsory · fixed name</em> : null}
+                </span>
+                <input
+                  value={level === '1' ? 'Item Type' : labels[level] || ''}
+                  maxLength={40}
+                  disabled={!can('settings.manage') || level === '1'}
+                  title={level === '1' ? 'Item Type is the compulsory first category — its name cannot be changed.' : undefined}
+                  onChange={(event) => setLabels({ ...labels, [level]: event.target.value })}
+                />
+              </label>
+            ))}
+            <div className="actions"><button className="btn primary" type="submit" disabled={pending || !can('settings.manage')}>Save category configuration</button></div>
+          </form>
+        </section>
+      ) : null}
+      {section === 'category' ? (
+        <section className="card">
+          <h2>Serial number fields</h2>
+          <p className="muted">Fields for serialised items, shown in the serial number grid on the item master and in stock entry. Tick a field to show it; the name you type is its column heading. Serial Number 1 is always on.</p>
+          <form className="form-grid" onSubmit={saveSerialFields}>
+            {SERIAL_FIELDS.map((key) => (
+              <label key={key}>
+                <span className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={key === 'serial1' || Boolean(serialVisible[key])}
+                    disabled={key === 'serial1' || !can('settings.manage')}
+                    onChange={(event) => setSerialVisible({ ...serialVisible, [key]: event.target.checked })}
+                  />
+                  {SERIAL_LABELS[key]}
+                </span>
+                <input
+                  value={serialLabels[key] || ''}
+                  maxLength={40}
+                  disabled={!can('settings.manage')}
+                  onChange={(event) => setSerialLabels({ ...serialLabels, [key]: event.target.value })}
+                />
+              </label>
+            ))}
+            <div className="actions"><button className="btn primary" type="submit" disabled={pending || !can('settings.manage')}>Save serial number fields</button></div>
+          </form>
+        </section>
+      ) : null}
+      {section === 'category' ? (
+        <section className="card">
+          <h2>Automatic category create</h2>
+          <p className="muted">When this is on, a name typed on the product form that is not already in the list is saved in Category & Brands.</p>
+          <form className="form-grid" onSubmit={saveAutoCreate}>
+            <label className="check-row">
+              <input type="checkbox" checked={autoCreate} disabled={!can('settings.manage')} onChange={(event) => setAutoCreate(event.target.checked)} />
+              Allow to create a new category Automatically
+            </label>
+            <div className="actions"><button className="btn primary" type="submit" disabled={pending || !can('settings.manage')}>Save</button></div>
+          </form>
+        </section>
+      ) : null}
       {section === 'master' ? <section className="card">
         <h2>Modules</h2>
         <p className="muted">Users and settings stay on. Other modules follow the plan, then this toggle.</p>
@@ -919,7 +974,33 @@ export function SettingsPage() {
 export function MenuPage() {
   const { slug } = useParams();
   const item = findMenuPage(slug);
-  if (!item) return <p className="banner">That page is not part of Stockkeep.</p>;
+  if (!item) return <p className="banner">That page is not part of SKPOS.</p>;
+  if (slug === 'price-list') return <PriceListPage />;
+  if (slug === 'price-updates') return <PriceUpdatePage />;
+  if (slug === 'purchase-config') return <PurchaseConfigPage />;
+  if (slug === 'print-barcodes') return <BarcodePrintPage />;
+  if (slug === 'stock-analysis') return <StockAnalysisPage />;
+  if (slug === 'org-structure') return <OrgStructurePage />;
+  if (slug === 'warranty') return <WarrantyPage />;
+  if (slug === 'unit-conversion') return <UnitConversionPage />;
+  if (slug === 'repacking') return <RepackPage />;
+  if (slug === 'print-templates') return <PrintTemplatesPage />;
+  if (slug === 'display-settings') return <DisplaySettingsPage />;
+  if (slug === 'shortcut-keys') return <ShortcutSettingsPage />;
+  if (slug === 'tender-types') return <TenderSettingsPage />;
+  if (slug === 'transfer-request') return <TransferListPage key="request" kind="request" />;
+  if (slug === 'transfer-out') return <TransferListPage key="out" kind="out" />;
+  if (slug === 'transfer-in') return <TransferListPage key="in" kind="in" />;
+  if (slug === 'transfer-approvals') return <TransferApprovalsPage />;
+  if (slug === 'transfer-config') return <TransferConfigPage />;
+  if (slug === 'wastage') return <WastagePage />;
+  if (slug === 'data-migration') return <DataMigrationPage />;
+  if (slug === 'stock-config') return <StockConfigPage />;
+  if (slug === 'data-cleanup') return <DataCleanupPage />;
+  if (slug === 'offers') return <OffersPage />;
+  if (slug === 'coupons') return <CouponsPage />;
+  if (slug === 'vouchers') return <VouchersPage />;
+  if (slug === 'loyalty') return <LoyaltyPage />;
   return (
     <section className="card">
       <h2>{item.label}</h2>
@@ -929,22 +1010,27 @@ export function MenuPage() {
   );
 }
 
+
 export function ModulePage() {
   const { feature } = useParams();
   const [params] = useSearchParams();
   const meta = FEATURES[feature];
-  const docTitle = DOC_LABELS[feature]?.[params.get('doc')];
+  const doc = params.get('doc');
+  const docTitle = DOC_LABELS[feature]?.[doc];
   const { request } = useAuth();
   const [status, setStatus] = useState('');
 
   useEffect(() => {
     if (!meta) return;
     request(`/vertical/${feature}/status`)
-      .then(() => setStatus('This module is on. The screens arrive in the next slice.'))
+      .then(() => setStatus(''))
       .catch((err) => setStatus(message(err)));
   }, [feature, meta, request]);
 
-  if (!meta) return <p className="banner">That page is not part of Stockkeep.</p>;
+  if (!meta) return <p className="banner">That page is not part of SKPOS.</p>;
+  if ((feature === 'sales' || feature === 'purchase') && docTitle) {
+    return <DocumentsPage key={`${feature}-${doc}`} module={feature} type={doc} />;
+  }
   return (
     <section className="card">
       <h2>{docTitle || meta.title}</h2>
@@ -952,5 +1038,70 @@ export function ModulePage() {
       <p className="pad-top"><span className="badge pending">Coming soon</span></p>
       {status ? <p className="muted pad-top">{status}</p> : null}
     </section>
+  );
+}
+
+// Inventory → Item Ledger: every stock movement, newest first.
+export function ItemLedgerPage() {
+  const { request } = useAuth();
+  const [movements, setMovements] = useState([]);
+  const [query, setQuery] = useState('');
+  const [location, setLocation] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const pageRef = useRef(null);
+  useFitHeight(pageRef);
+
+  useEffect(() => {
+    request('/stock/movements?limit=5000').then((data) => setMovements(data.items)).catch((err) => setError(message(err)));
+  }, [request]);
+
+  const locations = [...new Set(movements.map((row) => row.location.name).filter(Boolean))].sort();
+  const reasons = [...new Set(movements.map((row) => row.reason || row.movementType).filter(Boolean))].sort();
+  const q = query.trim().toLowerCase();
+  const shown = movements.filter((row) => (!location || row.location.name === location)
+    && (!reason || (row.reason || row.movementType) === reason)
+    && (!q || `${row.productName} ${row.sku} ${row.note}`.toLowerCase().includes(q)));
+  const qtyIn = shown.reduce((sum, row) => sum + Math.max(Number(row.qty) || 0, 0), 0);
+  const qtyOut = shown.reduce((sum, row) => sum + Math.min(Number(row.qty) || 0, 0), 0);
+
+  return (
+    <div ref={pageRef} className="fit-split">
+      {error ? <p className="banner">{error}</p> : null}
+      <section className="data-grid">
+        <div className="grid-toolbar">
+          <h2 className="grid-title">Item Ledger</h2>
+          <div className="grid-search"><input data-sc="search" value={query} placeholder="Search item, SKU or note" onChange={(event) => setQuery(event.target.value)} /></div>
+          <div className="grid-tools">
+            <select value={location} onChange={(event) => setLocation(event.target.value)}>
+              <option value="">All locations</option>
+              {locations.map((name) => <option key={name} value={name}>{name}</option>)}
+            </select>
+            <select value={reason} onChange={(event) => setReason(event.target.value)}>
+              <option value="">All reasons</option>
+              {reasons.map((name) => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>When</th><th>Item</th><th>Location</th><th>Qty</th><th>Reason</th><th>Note</th></tr></thead>
+            <tbody>
+              {shown.length ? shown.map((row) => (
+                <tr key={row.id}>
+                  <td>{when(row.createdAt)}</td>
+                  <td>{row.productName}<div className="muted">{row.sku}</div></td>
+                  <td>{row.location.name}</td>
+                  <td>{row.qty}</td>
+                  <td>{row.reason || row.movementType}</td>
+                  <td>{row.note || '—'}</td>
+                </tr>
+              )) : <tr><td className="empty" colSpan={6}>{movements.length ? 'No entries match the filters.' : 'The ledger is empty.'}</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div className="grid-foot">Total entries: <strong>{shown.length}</strong><em>Qty in {qtyIn}</em><em>Qty out {Math.abs(qtyOut)}</em></div>
+      </section>
+    </div>
   );
 }

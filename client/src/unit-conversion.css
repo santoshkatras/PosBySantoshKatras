@@ -1,0 +1,29 @@
+/* Inventory → Unit Conversion (list grid + entry window, same as the other screens) */
+.uc-page .uc-ck{width:36px;text-align:center}
+.uc-page .uc-ck input{width:16px;height:16px}
+.uc-page tr.on td{background:#f0f9ff}
+.uc-muted{color:#98a2b3}
+.uc-pill{display:inline-block;white-space:nowrap;border-radius:999px;padding:1px 9px;font-size:12px;font-weight:600;background:#eef4ff;color:#175cd3}
+.uc-status{display:inline-block;border-radius:999px;padding:1px 9px;font-size:12px;font-weight:600}
+.uc-status.on{background:#ecfdf3;color:#027a48}
+.uc-status.off{background:#f2f4f7;color:#667085}
+.uc-empty{color:#667085;font-size:13px;padding:14px;text-align:center}
+.uc-chain{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
+.uc-chain span{display:inline-flex;align-items:center;gap:4px;font-weight:600;color:#1d4ed8}
+.uc-chain span small{font-weight:500;color:#667085}
+.uc-chain i{font-style:normal;color:#98a2b3;margin:0 2px}
+/* entry window */
+.uc-grid .uc-cell{width:100%;height:34px;border:1px solid #d0d5dd;border-radius:7px;padding:0 8px;font-size:13px;background:#fff;color:#101828}
+.uc-grid input.uc-cell{text-align:right;max-width:130px}
+.uc-grid .uc-base td{background:#f9fafb;color:#475467}
+.uc-grid .ose-entry td .btn{margin-right:8px}
+.uc-grid .ose-entry .ose-entry-hint{color:#175cd3}
+/* unit / map pop-ups */
+.uc-form{display:grid;gap:10px 12px}
+.uc-form.two{grid-template-columns:1fr 1fr}
+.uc-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#344054;min-width:0}
+.uc-form input,.uc-form select{height:36px;border:1px solid #d0d5dd;border-radius:8px;padding:0 10px;font-size:13px;background:#fff;min-width:0}
+.uc-form .wide{grid-column:1/-1}
+.uc-check{flex-direction:row!important;align-items:center;gap:8px!important;font-weight:500!important}
+.uc-check input{width:auto!important;height:auto!important}
+.uc-page select.dc-status{min-width:170px}

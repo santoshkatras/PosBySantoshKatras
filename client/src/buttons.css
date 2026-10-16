@@ -1,0 +1,47 @@
+/* App-wide button look: rounded, coloured, fills on hover — same style as the Sales Bill tool buttons.
+   Loaded once from main.jsx; !important so it wins over older per-screen button rules. */
+:root{--btn-c:var(--accent,#2f6bff);--btn-bg:#eef4ff;--btn-bd:#c7d7fe}
+
+:is(.btn,.il-btn,.im-btn,.sg-btn,.nd-btn,.vt-btn,.fb-btn,.il-filter-btn,.lt-cols-btn,.dc-conv){
+  --c:var(--btn-c);--bg:var(--btn-bg);--bd:var(--btn-bd);
+  border-radius:999px !important;
+  background:var(--bg) !important;
+  border:1px solid var(--bd) !important;
+  color:var(--c) !important;
+  font-weight:700 !important;
+  box-shadow:0 1px 2px rgba(16,24,40,.06);
+  transition:background .15s,color .15s,box-shadow .15s,transform .08s,border-color .15s;
+  cursor:pointer;
+}
+:is(.btn,.il-btn,.im-btn,.sg-btn,.nd-btn,.vt-btn,.fb-btn,.il-filter-btn,.lt-cols-btn,.dc-conv):hover:not(:disabled){
+  background:var(--c) !important;border-color:var(--c) !important;color:#fff !important;
+  box-shadow:0 4px 12px color-mix(in srgb,var(--c) 32%,transparent);
+}
+:is(.btn,.il-btn,.im-btn,.sg-btn,.nd-btn,.vt-btn,.fb-btn,.il-filter-btn,.lt-cols-btn,.dc-conv):active:not(:disabled){transform:translateY(1px)}
+:is(.btn,.il-btn,.im-btn,.sg-btn,.nd-btn,.vt-btn,.fb-btn,.il-filter-btn,.lt-cols-btn,.dc-conv):disabled{opacity:.5;cursor:default;box-shadow:none}
+:is(.btn,.il-btn,.im-btn,.sg-btn,.nd-btn,.vt-btn,.fb-btn,.il-filter-btn,.lt-cols-btn,.dc-conv) svg{stroke:currentColor}
+
+/* primary = solid colour */
+:is(.btn,.il-btn,.im-btn,.sg-btn,.fb-btn).primary{
+  background:var(--c) !important;border-color:var(--c) !important;color:#fff !important;
+  box-shadow:0 2px 6px color-mix(in srgb,var(--c) 30%,transparent);
+}
+:is(.btn,.il-btn,.im-btn,.sg-btn,.fb-btn).primary:hover:not(:disabled){filter:brightness(1.08);box-shadow:0 6px 16px color-mix(in srgb,var(--c) 38%,transparent)}
+
+/* danger / delete = red */
+:is(.btn,.il-btn,.im-btn,.fb-btn):is(.danger,.dc-danger,.cfg-del,.pc-del){--c:#d92d20;--bg:#fef3f2;--bd:#fecdca}
+.fb-btn.primary.danger{--c:#d92d20}
+
+/* ghost / quiet buttons keep a light look */
+:is(.il-btn,.im-btn).ghost{--bg:transparent;--bd:transparent;--c:#475467;box-shadow:none}
+
+/* toggled filter / column buttons */
+:is(.il-filter-btn,.lt-cols-btn).on{background:var(--c) !important;color:#fff !important;border-color:var(--c) !important}
+:is(.il-filter-btn,.lt-cols-btn).on .il-count{background:#fff;color:var(--c)}
+
+/* shortcut key badge readable on both looks */
+:is(.btn,.il-btn,.im-btn):not(.primary)[data-keys]::after{background:rgba(255,255,255,.75);color:var(--c);opacity:1}
+:is(.btn,.il-btn,.im-btn):hover[data-keys]::after{background:rgba(255,255,255,.25);color:#fff}
+
+/* keep the special colours some screens already use */
+.btn.ds-previewing{--c:#b54708;--bg:#fffaeb;--bd:#fedf89}

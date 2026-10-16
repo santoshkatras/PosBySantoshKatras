@@ -39,10 +39,14 @@ test('one tenant cannot read another tenant products', async () => {
     const workshop = await signup(base, 'beta', 'bike_service');
     const units = await fetch(`${base}/api/units`, { headers: { authorization: `Bearer ${shop.accessToken}` } });
     const unitId = (await units.json()).items[0].id;
+    const shopJson = { 'content-type': 'application/json', authorization: `Bearer ${shop.accessToken}` };
+    const noType = await fetch(`${base}/api/products`, { method: 'POST', headers: shopJson, body: JSON.stringify({ name: 'No type', unitId, variant: { sku: 'NOTYPE-1' } }) });
+    assert.equal(noType.status, 400, 'Item Type (Category 1) is compulsory');
+    const categoryId = (await (await fetch(`${base}/api/categories`, { method: 'POST', headers: shopJson, body: JSON.stringify({ name: 'Laptops', level: '1' }) })).json()).id;
     const created = await fetch(`${base}/api/products`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${shop.accessToken}` },
-      body: JSON.stringify({ name: 'Alpha laptop', unitId, gstRate: '18', variant: { sku: 'ALPHA-1', salePrice: '100', costPrice: '40', minStock: '0' } }),
+      headers: shopJson,
+      body: JSON.stringify({ name: 'Alpha laptop', unitId, categoryId, gstRate: '18', variant: { sku: 'ALPHA-1', salePrice: '100', costPrice: '40', minStock: '0' } }),
     });
     assert.equal(created.status, 201);
     const spoof = await fetch(`${base}/api/products`, {
@@ -97,10 +101,11 @@ test('stock adjustment writes the ledger and refuses a negative result', async (
     const token = { authorization: `Bearer ${shop.accessToken}` };
     const unitId = (await (await fetch(`${base}/api/units`, { headers: token })).json()).items[0].id;
     const locationId = (await (await fetch(`${base}/api/locations`, { headers: token })).json()).items[0].id;
+    const categoryId = (await (await fetch(`${base}/api/categories`, { method: 'POST', headers: { ...token, 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Cables', level: '1' }) })).json()).id;
     const product = await (await fetch(`${base}/api/products`, {
       method: 'POST',
       headers: { ...token, 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'USB cable', unitId, variant: { sku: 'USB-1', costPrice: '10', minStock: '0' } }),
+      body: JSON.stringify({ name: 'USB cable', unitId, categoryId, variant: { sku: 'USB-1', costPrice: '10', minStock: '0' } }),
     })).json();
     const adjusted = await fetch(`${base}/api/stock/adjustments`, {
       method: 'POST',
@@ -118,6 +123,38 @@ test('stock adjustment writes the ledger and refuses a negative result', async (
       body: JSON.stringify({ locationId, variantId: product.variants[0].id, qtyDelta: '-5', reason: 'loss' }),
     });
     assert.equal(negative.status, 400);
+  } finally {
+    await close();
+  }
+});
+
+test('every inward gets a new unique 13-digit stock barcode and outward takes stock from the chosen one', async () => {
+  const { base, close } = await boot();
+  try {
+    const shop = await signup(base, 'lots', 'computer_shop');
+    const headers = { authorization: `Bearer ${shop.accessToken}`, 'content-type': 'application/json' };
+    const get = async (path) => (await fetch(`${base}/api${path}`, { headers })).json();
+    const post = (path, body) => fetch(`${base}/api${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+    const unitId = (await get('/units')).items[0].id;
+    const locationId = (await get('/locations')).items[0].id;
+    const categoryId = (await (await post('/categories', { name: 'Mice', level: '1' })).json()).id;
+    const product = await (await post('/products', { name: 'Mouse', unitId, categoryId, variant: { sku: 'MS-1', costPrice: '100', salePrice: '150' } })).json();
+    const variantId = product.variants[0].id;
+    for (const qtyDelta of ['5', '3']) assert.equal((await post('/stock/adjustments', { locationId, variantId, qtyDelta, reason: 'found' })).status, 201);
+    const lots = (await get(`/stock-lots?variantId=${variantId}&locationId=${locationId}`)).items;
+    assert.equal(lots.length, 2);
+    const ean = (code) => /^2\d{12}$/.test(code) && String((10 - (code.slice(0, 12).split('').reduce((s, d, i) => s + Number(d) * (i % 2 ? 3 : 1), 0) % 10)) % 10) === code[12];
+    assert.ok(lots.every((lot) => ean(lot.barcode)), 'valid 13-digit EAN-13 codes');
+    assert.notEqual(lots[0].barcode, lots[1].barcode);
+    const second = lots.find((lot) => lot.qty === 3);
+    assert.equal((await post('/stock/adjustments', { locationId, variantId, qtyDelta: '-2', reason: 'damage', pick: [{ barcode: second.barcode, qty: 2 }] })).status, 201);
+    const after = (await get(`/stock-lots?variantId=${variantId}&locationId=${locationId}`)).items;
+    assert.equal(after.find((lot) => lot.barcode === second.barcode).qty, 1, 'taken from the chosen barcode only');
+    assert.equal(after.find((lot) => lot.barcode !== second.barcode).qty, 5);
+    const tooMuch = await post('/stock/adjustments', { locationId, variantId, qtyDelta: '-2', reason: 'damage', pick: [{ barcode: second.barcode, qty: 2 }] });
+    assert.equal(tooMuch.status, 400);
+    const found = await get(`/stock-lots/code/${second.barcode}?locationId=${locationId}`);
+    assert.equal(found.variantId, variantId);
   } finally {
     await close();
   }

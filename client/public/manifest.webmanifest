@@ -1,6 +1,6 @@
 {
-  "name": "Stockkeep",
-  "short_name": "Stockkeep",
+  "name": "SKPOS",
+  "short_name": "SKPOS",
   "description": "Inventory for Indian computer shops and bike service centres.",
   "start_url": "/",
   "display": "standalone",

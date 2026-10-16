@@ -1,0 +1,141 @@
+/* Opening Stock Entry: list page, entry window and item pop-ups */
+.ose-done{margin:0;padding:10px 14px;border:1px solid #abefc6;background:#ecfdf3;color:#067647;border-radius:10px;font-size:13.5px;font-weight:600}
+.ose-link{border:0;background:none;padding:0;color:var(--accent);font-weight:700;cursor:pointer;font-size:13px}
+.ose-link:hover{text-decoration:underline}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+/* window */
+.modal-back.ose-back{padding:2vh 1.5vw;place-items:stretch center}
+.ose-window{width:min(1320px,97vw);height:96vh;max-height:96vh;display:flex;flex-direction:column;background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(15,23,42,.28);overflow:hidden;font-family:Inter,General Sans,system-ui,sans-serif;color:#101828}
+.ose-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 20px 12px;border-bottom:1px solid #eef1f6}
+.ose-title h2{margin:0;font-size:18px;font-weight:700;letter-spacing:-.01em}
+.ose-title p{margin:3px 0 0;color:#667085;font-size:13px}
+.ose-x{border:0;background:#f2f4f7;color:#475467;width:32px;height:32px;border-radius:8px;font-size:20px;line-height:1;cursor:pointer;flex:none}
+.ose-x:hover{background:#fee4e2;color:#b42318}
+.ose-head{display:flex;flex-wrap:wrap;gap:10px 14px;padding:12px 20px;background:#f8fafc;border-bottom:1px solid #eef1f6}
+.ose-head label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:700;color:#475467;text-transform:uppercase;letter-spacing:.03em}
+.ose-head input,.ose-head select{border:1px solid #d0d5dd;border-radius:8px;padding:8px 10px;font-size:13.5px;background:#fff;color:#101828;min-width:150px;text-transform:none;letter-spacing:0;font-weight:500}
+.ose-head input[readonly]{background:#f2f4f7;color:#344054;width:140px;min-width:0}
+.ose-head select{min-width:220px}
+.ose-head .grow{flex:1;min-width:240px}
+.ose-head .grow input{width:100%;box-sizing:border-box}
+
+.ose-table{flex:1;min-height:0;overflow:auto;margin:12px 20px 0;border:1px solid #e4e7ec;border-radius:10px;overscroll-behavior:contain}
+.ose-table table{width:100%;min-width:1080px;table-layout:fixed;border-collapse:separate;border-spacing:0;font-size:13px}
+.ose-table thead th,.ose-mx thead th{position:sticky;top:0;z-index:2;background:#f8fafc;color:#475467;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:10px 10px;border-bottom:1px solid #e4e7ec;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ose-table tbody td,.ose-mx tbody td{padding:8px 10px;border-bottom:1px solid #f2f4f7;vertical-align:middle;overflow:hidden;text-overflow:ellipsis}
+.ose-table tbody tr:not(.ose-entry):hover td{background:#f5f9ff}
+.ose-table th.num,.ose-table td.num,.ose-mx th.num,.ose-mx td.num{text-align:right;font-variant-numeric:tabular-nums}
+.ose-n{width:44px;color:#98a2b3;text-align:right}
+.ose-name{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ose-table td small{display:block;color:#667085;font-size:12px;margin-top:1px}
+.ose-kind{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600;font-style:normal;background:#f2f4f7;color:#344054;white-space:nowrap}
+.ose-kind.standard{background:#eef4ff;color:#3538cd}
+.ose-kind.matrix{background:#fdf2fa;color:#c11574}
+.ose-kind.serial{background:#ecfdf3;color:#067647}
+.ose-act{text-align:right;white-space:nowrap}
+.ose-act button{border:1px solid transparent;background:none;width:30px;height:30px;border-radius:8px;color:#667085;cursor:pointer;display:inline-grid;place-items:center;font-size:18px;padding:0;vertical-align:middle}
+.ose-act button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ose-act button:hover{background:#eef4ff;color:var(--accent)}
+.ose-act button.del:hover{background:#fef3f2;color:#b42318}
+.ose-entry td{background:#fcfcfd;border-bottom:0;position:sticky;bottom:0;z-index:1;box-shadow:0 -1px 0 #e4e7ec}
+.ose-entry-hint{color:#98a2b3;font-size:12.5px}
+.ose-search input{width:100%;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;color:#101828}
+.ose-search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #c5dbff66}
+.ose-drop{position:fixed;z-index:5000;max-height:260px;overflow:auto;background:#fff;border:1px solid #d0d5dd;border-radius:10px;box-shadow:0 16px 36px rgba(16,24,40,.18);padding:4px}
+.ose-drop button{display:grid;grid-template-columns:150px 1fr auto;gap:10px;align-items:center;width:100%;border:0;background:none;text-align:left;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:#101828}
+.ose-drop button span{color:#475467;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ose-drop button strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ose-drop button.on{background:#eef4ff}
+.ose-drop p{margin:0;padding:12px;color:#667085;font-size:13px}
+
+.ose-foot{display:flex;align-items:center;gap:10px;padding:12px 20px 16px;flex-wrap:wrap}
+.ose-totals{display:flex;gap:18px;margin-right:auto;font-size:13px;color:#475467}
+.ose-totals strong{color:#101828;font-size:15px;margin-left:4px}
+.ose-error{color:#b42318;font-weight:600;font-size:13px}
+.ose-hint{color:#475467;font-size:13px;margin-right:auto}
+.ose-hint strong{color:#101828}
+
+/* pop-ups */
+.modal-back.ose-pop-back{z-index:120;background:#0f172a59}
+.ose-pop{width:min(560px,94vw);max-height:90vh;display:flex;flex-direction:column;background:#fff;border-radius:14px;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;font-family:Inter,General Sans,system-ui,sans-serif;color:#101828}
+.ose-pop.wide{width:min(1100px,95vw)}
+.ose-pop.wide.serial{width:min(1260px,96vw)}
+.ose-pop>header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:14px 18px 10px;border-bottom:1px solid #eef1f6}
+.ose-pop h3{margin:0;font-size:16px;font-weight:700}
+.ose-pop header p{margin:3px 0 0;color:#667085;font-size:12.5px}
+.ose-pop-body{padding:14px 18px;overflow:auto;min-height:0;display:flex;flex-direction:column;gap:10px}
+.ose-pop>footer{display:flex;align-items:center;gap:10px;justify-content:flex-end;padding:12px 18px 14px;border-top:1px solid #eef1f6}
+.ose-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ose-fields label{display:flex;flex-direction:column;gap:5px;font-size:12.5px;font-weight:600;color:#344054}
+.ose-fields input{border:1px solid #d0d5dd;border-radius:8px;padding:9px 11px;font-size:14px;text-align:right;font-variant-numeric:tabular-nums}
+.ose-fields input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #c5dbff66}
+.ose-fields .ose-qty{grid-column:1 / -1}
+.ose-fields .ose-qty input{font-size:20px;font-weight:700;padding:10px 12px}
+.ose-note{margin:0;color:#98a2b3;font-size:12px}
+.ose-mx-bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12.5px;color:#667085}
+.ose-filter{border:1px solid #d0d5dd;border-radius:8px;padding:7px 10px;font-size:13px;min-width:260px}
+.ose-mx{overflow:auto;max-height:min(52vh,460px);border:1px solid #e4e7ec;border-radius:10px;overscroll-behavior:contain}
+.ose-mx table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+.ose-mx td input{width:96px;border:1px solid #e4e7ec;border-radius:6px;padding:6px 8px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums;background:#fff}
+.ose-mx td input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #c5dbff66}
+.ose-mx tr.has-qty td{background:#f6fef9}
+
+.ose-colhead{display:inline-flex;align-items:center;gap:6px}
+.ose-empty{text-align:center;color:#98a2b3;padding:22px}
+.ose-detail{color:#475467;font-size:12.5px;white-space:normal}
+
+/* phones: the whole entry window scrolls, so the item table keeps a usable height */
+@media (max-width:700px){
+  .ose-window{width:100vw;height:100dvh;max-height:100dvh;border-radius:0;overflow-y:auto;overflow-x:hidden}
+  .ose-window>.ose-table{flex:none;min-height:300px;max-height:60vh;margin:10px 12px 0}
+  .ose-window>.ose-head,.ose-window>.ose-top{flex:none}
+  .ose-window>.ose-foot{flex:none;position:sticky;bottom:0;background:#fff;z-index:3;box-shadow:0 -6px 16px rgba(15,23,42,.08)}
+}
+
+/* ---- taller, compact entry windows (more item rows visible on a laptop screen) ---- */
+@media (min-width:701px){
+  .modal-back.ose-back{padding:8px 10px}
+  .ose-window{width:min(1520px,99vw);height:calc(100vh - 16px);max-height:calc(100vh - 16px);border-radius:12px}
+  .ose-top{padding:8px 16px 6px}
+  .ose-title h2{font-size:16px}
+  .ose-title p{font-size:12px;margin-top:1px}
+  .ose-x{width:28px;height:28px;font-size:18px}
+  .ose-head{padding:6px 16px 8px;gap:6px 12px}
+  .ose-head label{font-size:10.5px;gap:2px}
+  .ose-head input,.ose-head select{padding:5px 8px;font-size:13px}
+  .ose-table{margin:6px 12px 0}
+  .ose-table thead th{padding:6px 8px;font-size:10.5px}
+  .ose-table tbody td{padding:4px 8px;font-size:12.5px}
+  .ose-table td small{font-size:11px;margin-top:0;line-height:1.25}
+  .ose-entry td{padding:5px 8px}
+  .ose-entry input{padding:5px 8px !important}
+  .ose-foot{padding:6px 14px 8px}
+}
+@media (min-width:701px){
+  .ose-table .ose-act button{width:24px;height:24px;padding:0}
+  .ose-table .ose-act button svg{width:14px;height:14px}
+  .ose-table .ose-kind{padding:1px 7px;font-size:11px}
+  .ose-table tbody td{line-height:1.3}
+}
+/* One height for every box in the window header (text, date, select, search), labels on one top line */
+.ose-head{align-items:flex-start}
+.ose-head input:not([type=checkbox]):not([type=radio]),.ose-head select,.ose-head .dc-party input{height:36px !important;min-height:36px;box-sizing:border-box;padding-top:0 !important;padding-bottom:0 !important;line-height:normal;font-size:13.5px}
+.ose-head input[type=date]{padding-right:6px !important}
+.ose-head label.dc-check{align-self:flex-start;align-items:center;padding:0 !important;height:36px;margin-top:0}
+.ose-head .dc-field{gap:4px}
+@media (min-width:701px){
+  .ose-head input:not([type=checkbox]):not([type=radio]),.ose-head select,.ose-head .dc-party input{height:34px !important;min-height:34px;font-size:13px}
+  .ose-head label.dc-check{height:28px}
+  .ose-head .dc-field{gap:2px;font-size:10.5px}
+}
+/* stock barcodes in the entry view */
+.ose-codes{display:flex;flex-wrap:wrap;gap:4px;max-width:420px}
+.ose-code{display:inline-flex;flex-direction:column;background:#eef4ff;border:1px solid #d6e4ff;border-radius:6px;padding:2px 7px;line-height:1.25}
+.ose-code b{font:700 12px/16px ui-monospace,SFMono-Regular,Menlo,monospace;color:#1d4ed8;letter-spacing:.02em}
+.ose-code em{font-style:normal;font-size:11px;color:#475467}
+.ose-code.older{background:#fff8eb;border-color:#fde3b0}.ose-code.older b{color:#b45309}
+.ose-code.sold{background:#f2f4f7;border-color:#e4e7ec}.ose-code.sold b{color:#667085;text-decoration:line-through}
+.ose-muted{color:#98a2b3}
+.ose-saved-note{margin:0 0 10px;padding:8px 12px;border-radius:8px;background:#ecfdf3;border:1px solid #abefc6;color:#067647;font-size:13px}
+.ose-mx td:has(.ose-codes){white-space:normal;vertical-align:top}

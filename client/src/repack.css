@@ -1,0 +1,27 @@
+.rp-top { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 12px; }
+.rp-top label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted, #64748b); min-width: 160px; }
+.rp-top label.grow { flex: 1 1 200px; }
+.rp-top input, .rp-top select { height: 34px; border: 1px solid var(--line, #d7dde6); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13px; background: var(--surface, #fff); color: inherit; }
+.rp-table td small { display: block; font-size: 11px; color: var(--muted, #64748b); margin-top: 2px; }
+.rp-table td input { width: 90px; text-align: right; }
+.rp-batch { display: inline-flex; gap: 6px; }
+.rp-batch input { width: 120px !important; text-align: left !important; }
+.rp-empty { padding: 24px; text-align: center; color: var(--muted, #64748b); background: var(--soft, #f6f8fb); border-radius: 10px; }
+.rp-codes { display: flex; flex-wrap: wrap; gap: 4px; }
+.rp-codes span { font: 11px/1.4 ui-monospace, monospace; padding: 1px 6px; border-radius: 6px; }
+.rp-codes .in { background: #e8f6ee; color: #146c3c; }
+.rp-codes .out { background: #fdeceb; color: #a1281e; }
+.rp-pop .ose-mx { max-height: 52vh; }
+@media (max-width: 700px) { .rp-top label { min-width: 0; flex: 1 1 100%; } }
+.rp-sub td { background: #fafcff; padding-top: 4px !important; padding-bottom: 10px !important; }
+.rp-exp { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end; padding-left: 4px; }
+.rp-exp > b { font-size: 12px; color: #344054; align-self: center; min-width: 170px; }
+.rp-exp label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; font-weight: 600; color: var(--muted, #64748b); }
+.rp-table .rp-exp input { width: 150px !important; text-align: left !important; height: 32px; }
+.rp-exp > span { font-size: 12.5px; color: #344054; align-self: center; }
+.rp-exp > span small { display: block; font-size: 11px; color: var(--muted, #64748b); }
+.rp-exp em { color: #b42318; font-style: normal; font-weight: 600; }
+.rp-cellexp { display: block; font-size: 12.5px; }
+.rp-cellexp small { display: block; font-size: 11px; color: var(--muted, #64748b); }
+.ose-window .rp-exp, .modal-back .rp-exp { margin-top: 14px; padding: 12px; border: 1px solid #e4e7ec; border-radius: 10px; background: #fafcff; }
+.rp-exp input { width: 150px; height: 34px; border: 1px solid #d0d5dd; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 13px; }

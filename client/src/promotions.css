@@ -1,0 +1,75 @@
+/* Promotions: offers, coupons, vouchers, loyalty */
+.pr-num{display:flex;align-items:center;border:1px solid #d0d5dd;border-radius:8px;background:#fff;overflow:hidden}
+.pr-num input{border:0 !important;outline:0;min-width:0;width:100%;padding:8px 10px;font-family:inherit;font-size:13.5px}
+.pr-num em{font-style:normal;color:#667085;font-size:12px;padding:0 8px;background:#f9fafb;align-self:stretch;display:flex;align-items:center}
+.pr-hint{font-weight:400;color:#98a2b3;font-size:11.5px}
+.pr-multi{display:flex;flex-direction:column;gap:6px;font-weight:400;min-width:0}
+.pr-chips{display:flex;flex-wrap:wrap;gap:4px}
+.pr-chips span{display:inline-flex;align-items:center;gap:4px;background:var(--accent-soft,#eef4ff);color:var(--accent,#1d4ed8);border-radius:999px;padding:2px 4px 2px 10px;font-size:12px;font-weight:600}
+.pr-chips span button{border:0;background:rgba(0,0,0,.06);border-radius:50%;width:18px;height:18px;cursor:pointer;line-height:1}
+.pr-chips small{color:#98a2b3;font-size:12px}
+.pr-multi>input{border:1px solid #d0d5dd;border-radius:8px;padding:7px 10px;font-family:inherit;font-size:13px}
+.pr-opts{max-height:150px;overflow:auto;border:1px solid #f2f4f7;border-radius:8px;padding:4px 8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0 10px}
+.pr-opts label{display:flex;gap:6px;align-items:center;font-size:12.5px;padding:3px 0;cursor:pointer;color:#344054}
+.pr-opts small{color:#98a2b3}
+.pr-scope{display:flex;flex-direction:column;gap:8px;font-weight:400}
+.pr-form textarea{width:100%;border:1px solid #d0d5dd;border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;resize:vertical}
+.pr-form .cfg-field textarea{font-weight:400}
+.pr-explain{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#f9fafb;border:1px solid #eaecf0;border-radius:10px;padding:9px 12px;font-size:13px;margin-bottom:4px}
+.pr-bad{color:#b42318;font-style:normal;font-weight:600}
+.pr-good{color:#067647;font-style:normal;font-weight:600}
+.pr-typebtn{border:1px solid #d0d5dd;background:#fff;border-radius:8px;padding:8px 10px;text-align:left;font-family:inherit;font-size:13.5px;cursor:pointer;font-weight:600;display:flex;justify-content:space-between}
+.pr-typebtn small{color:var(--accent,#2f6bff)}
+.pr-days{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;font-weight:600;color:#344054}
+.pr-days button{border:1px solid #d0d5dd;background:#fff;border-radius:8px;padding:5px 10px;cursor:pointer;font-family:inherit;font-size:12.5px}
+.pr-days button.on{background:var(--accent,#2f6bff);border-color:var(--accent,#2f6bff);color:#fff}
+.pr-days small{color:#98a2b3;font-weight:400}
+.pr-slabs table,.pr-table{border-collapse:collapse;font-size:13px;width:100%;max-width:640px}
+.pr-table{max-width:none}
+.pr-slabs th,.pr-table th{font-size:11px;text-transform:uppercase;color:#667085;text-align:left;padding:5px 6px;border-bottom:1px solid #eaecf0}
+.pr-slabs td,.pr-table td{padding:5px 6px;border-bottom:1px solid #f2f4f7}
+.pr-table td input:not([type=color]){border:1px solid #d0d5dd;border-radius:8px;padding:6px 8px;font-family:inherit;width:100%}
+.pr-table .num{text-align:right}
+.pr-combo{margin:6px 0}
+.pr-ex{margin-top:8px;font-size:13px}
+.pr-ex summary{cursor:pointer;color:#475467;font-weight:600;margin-bottom:6px}
+.pr-gal{margin-top:12px}
+.pr-gal h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#667085}
+.pr-gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.pr-gal-grid button{border:1px solid #e4e7ec;background:#fff;border-radius:12px;padding:10px 12px;text-align:left;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:3px;position:relative}
+.pr-gal-grid button:hover:not(:disabled){border-color:var(--accent,#2f6bff);box-shadow:0 2px 10px rgba(16,24,40,.08)}
+.pr-gal-grid button.on{border-color:var(--accent,#2f6bff);background:var(--accent-soft,#eef4ff)}
+.pr-gal-grid strong{font-size:13.5px}
+.pr-gal-grid small{color:#667085;font-size:12px}
+.pr-gal-grid i{font-style:normal;font-size:10.5px;color:#475467;background:#f2f4f7;border-radius:99px;padding:1px 7px;align-self:flex-start;margin-top:2px}
+.ose-pop.pr-gallery-pop{width:min(1000px,96vw)}
+.pr-gal-search{width:100%}
+.pr-start{display:flex;flex-direction:column;gap:6px}
+.pr-series{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.pr-codes{display:flex;flex-wrap:wrap;gap:4px;max-height:160px;overflow:auto;background:#f9fafb;border-radius:8px;padding:8px}
+.pr-codes span{font-family:ui-monospace,monospace;font-size:11.5px;background:#fff;border:1px solid #eaecf0;border-radius:6px;padding:2px 6px}
+.pr-codes span.used{text-decoration:line-through;color:#98a2b3}
+.pr-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.pr-stats div{background:#fff;border:1px solid #e4e7ec;border-radius:12px;padding:10px 14px;display:flex;flex-direction:column}
+.pr-stats small{color:#667085;font-size:12px}
+.pr-stats strong{font-size:18px}
+.pr-vtable{padding:0;overflow:auto}
+.pr-vtable table{width:100%}
+.pr-vtable tr:hover td{background:#f9fafb}
+.pr-sub{display:block;color:#98a2b3;font-size:11.5px}
+.pr-sub.warn{color:#b54708}
+.pr-badge{font-size:11.5px;border-radius:999px;padding:2px 9px;background:#f2f4f7;color:#475467;text-transform:capitalize;font-weight:600}
+.pr-badge.ok{background:#ecfdf3;color:#067647}
+.pr-badge.warn{background:#fffaeb;color:#b54708}
+.pr-badge.off{background:#fef3f2;color:#b42318}
+.pr-tier{color:#fff;font-size:11.5px;border-radius:999px;padding:2px 9px;font-weight:700}
+.pr-vstats{display:flex;flex-wrap:wrap;gap:8px 18px;background:#f9fafb;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#475467}
+.pr-vstats .warn strong{color:#b54708}
+.pr-h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#667085}
+.pr-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;max-height:200px;overflow:auto;margin:8px 0}
+.pr-pick button{border:1px solid #e4e7ec;background:#fff;border-radius:10px;padding:7px 10px;text-align:left;cursor:pointer;font-family:inherit;display:flex;flex-direction:column}
+.pr-pick button.on{border-color:var(--accent,#2f6bff);background:var(--accent-soft,#eef4ff)}
+.pr-pick small{color:#667085}
+.pr-how{list-style:none;padding:0;margin:8px 0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.pr-how b{color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;margin-right:4px}
+.cfg-block.first{border-top:0;padding-top:0}

@@ -1,0 +1,102 @@
+/* Dashboard — Sales / Purchase / Stock / Wastage / Statistics / Top Selling */
+.ov{display:flex;flex-direction:column;gap:14px;font-family:Poppins,Inter,General Sans,system-ui,sans-serif;color:#1d2433}
+.ov-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.ov-head h1{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;letter-spacing:-.01em}
+.ov-logo{width:32px;height:32px;border-radius:8px;background:#7b5cd6;display:grid;place-items:center}
+.ov-logo svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round}
+.ov-filters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;padding:4px;border-radius:12px;transition:box-shadow .3s ease}
+.ov-filters.flash{box-shadow:0 0 0 3px #c9b8f3}
+.ov-filters label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:700;color:#7a8091;text-transform:uppercase;letter-spacing:.04em}
+.ov-filters select,.ov-filters input{height:36px;border:1px solid #dcdfe7;border-radius:8px;padding:0 10px;background:#fff;font-size:13px;color:#1d2433;text-transform:none;letter-spacing:0;font-weight:500;font-family:inherit}
+.ov-filters select{min-width:150px}
+.ov-range{margin:-8px 0 0;font-size:12.5px;color:#7a8091}
+
+.ov-row1{display:grid;grid-template-columns:1.9fr 1.9fr 1.2fr 1.3fr;gap:14px}
+.ov-row2{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+.ov-card{background:#fff;border:1px solid #e9ebf1;border-radius:10px;box-shadow:0 2px 6px rgba(26,32,52,.06);padding:14px 16px 18px;display:flex;flex-direction:column;gap:14px;min-width:0;position:relative}
+.ov-card>header{display:flex;align-items:center;gap:12px}
+.ov-card h3{font-size:14px;font-weight:700;color:#1d2433;margin-right:auto;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ov-tools{flex:none}
+.ov-tools{display:flex;gap:2px}
+.ov-tools button{width:22px;height:22px;border:0;background:transparent;border-radius:6px;display:grid;place-items:center;cursor:pointer;color:#7b5cd6;padding:0}
+.ov-tools button:hover{background:#f1ecfd}
+.ov-tools svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ov-tools svg.spin{animation:ov-spin .8s linear infinite}
+@keyframes ov-spin{to{transform:rotate(360deg)}}
+
+.ov-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 18px;padding:6px 4px 0}
+.ov-tiles.single{grid-template-columns:1fr;gap:22px}
+.ov-tile{display:flex;align-items:center;gap:14px;min-width:0}
+.ov-tile p{font-size:12px;color:#5b6170;margin:0 0 2px}
+.ov-tile strong{display:block;font-size:20px;font-weight:700;letter-spacing:-.01em;color:#1d2433;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.ov-tile>div{min-width:0}
+.ov-ico{width:54px;height:54px;border-radius:9px;display:grid;place-items:center;flex:none}
+.ov-ico svg{width:26px;height:26px;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ov-ico.cyan{background:#dff7fd}.ov-ico.cyan svg{stroke:#17b3d6;fill:#bdeefa}
+.ov-ico.amber{background:#fff4dc}.ov-ico.amber svg{stroke:#f2a516;fill:#ffe7b0}
+.ov-ico.rose{background:#ffe9e4}.ov-ico.rose svg{stroke:#f2765a;fill:#ffd2c7}
+.ov-ico.teal{background:#dcf3ef}.ov-ico.teal svg{stroke:#139c86;fill:#bfe9e1}
+.ov-ico.violet{background:#f6e4fb}.ov-ico.violet svg{stroke:#c04bd8;fill:#efc7f7}
+.ov-ico.red{background:#ffe5e7}.ov-ico.red svg{stroke:#ef4b5f;fill:none}
+.ov-ico.orange{background:#ffeadf}.ov-ico.orange svg{stroke:#f37b3d;fill:#ffd6c0}
+.ov-ico.pink{background:#fde4ee}.ov-ico.pink svg{stroke:#e04f8a;fill:none}
+.ov-ico.peach{background:#ffe9e2}.ov-ico.peach svg{stroke:#ef7a52;fill:#ffd3c4}
+
+.ov-gauge{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px}
+.ov-gauge svg{width:100%;max-width:200px}
+.ov-gauge-mid{position:absolute;top:40%;left:0;right:0;text-align:center;display:flex;flex-direction:column}
+.ov-gauge-mid strong{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.ov-gauge-mid span{font-size:11.5px;color:#7a8091}
+.ov-keys{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:#3b4150;align-self:stretch;padding:0 6px}
+.ov-keys li{display:flex;align-items:center;gap:8px}
+.ov-keys i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.ov-keys em{margin-left:auto;font-style:normal;font-weight:700;color:#1d2433;font-variant-numeric:tabular-nums}
+
+.ov-headline{display:flex;align-items:center;gap:10px;margin-left:auto;font-size:13px}
+.ov-headline strong{display:inline-flex;align-items:center;gap:4px;color:#7b5cd6;font-weight:700}
+.ov-headline svg{width:16px;height:16px;background:#efe9fc;border-radius:4px;padding:2px;fill:none;stroke:#7b5cd6;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.ov-headline span{color:#3b4150}
+.ov-stats>header h3{margin-right:0}
+.ov-stats .ov-tools{margin-left:12px}
+
+.ov-chart{position:relative;width:100%}
+.ov-chart svg{display:block;cursor:crosshair}
+.ov-grid{stroke:#eef0f4;stroke-width:1}
+.ov-axis{font-size:11px;fill:#5b6170;font-variant-numeric:tabular-nums;font-family:inherit}
+.ov-cross{stroke:#c9cdd8;stroke-width:1;stroke-dasharray:3 3}
+.ov-bubble{position:absolute;transform:translateX(-50%);background:#fff;border:1px solid #eceef3;box-shadow:0 4px 14px rgba(26,32,52,.14);border-radius:6px;padding:5px 12px;text-align:center;pointer-events:none;white-space:nowrap}
+.ov-bubble strong{display:block;font-size:13px;font-variant-numeric:tabular-nums}
+.ov-bubble span{display:block;font-size:10.5px;color:#7a8091}
+.ov-datepill{position:absolute;transform:translateX(-50%);background:#7b5cd6;color:#fff;font-size:11px;font-weight:600;border-radius:4px;padding:3px 8px;pointer-events:none;white-space:nowrap}
+.ov-empty-chart{position:absolute;left:64px;right:16px;top:42%;text-align:center;color:#7a8091;font-size:13px;pointer-events:none;margin:0}
+.ov-empty{color:#7a8091;font-size:13px;text-align:center;padding:30px 0;margin:0}
+
+.ov-pie{display:flex;flex-direction:column;align-items:center;gap:16px;flex:1;justify-content:center}
+.ov-pie-box{position:relative;width:100%;display:flex;justify-content:center}
+.ov-pie svg{width:100%;max-width:240px}
+.ov-modal .ov-pie svg{max-width:360px}
+.ov-pie path{cursor:pointer;transition:opacity .15s ease}
+.ov-pie-label{font-size:9.5px;font-weight:700;fill:#fff;pointer-events:none;font-family:inherit}
+.ov-pie-tip{position:absolute;top:0;right:0;background:#1d2433;color:#fff;border-radius:6px;padding:5px 10px;font-size:11.5px;display:flex;flex-direction:column}
+.ov-pie-tip span{color:#c7cbd5;font-size:10.5px}
+.ov-pie-legend{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:8px 16px;font-size:10.5px;color:#3b4150;font-weight:500;letter-spacing:.02em}
+.ov-pie-legend li{display:inline-flex;align-items:center;gap:6px}
+.ov-pie-legend i{width:11px;height:11px;border-radius:2px;display:inline-block}
+
+.ov-modal{z-index:120}
+.ov-modal-card{width:min(1100px,94vw);max-height:90vh;overflow:auto;position:relative}
+.ov-modal-card .ov-card{padding:20px 56px 24px 24px}
+.ov-close{position:absolute;top:10px;right:10px;z-index:2;width:32px;height:32px;border-radius:50%;border:0;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.2);font-size:20px;cursor:pointer}
+
+@media (max-width:1360px){.ov-row1{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:1100px){.ov-row2{grid-template-columns:1fr}}
+@media (max-width:700px){.ov-row1{grid-template-columns:1fr}}
+.ov-view{display:inline-flex;gap:4px;padding:4px;margin-left:8px;border-radius:12px;border:1px solid #e2e8f0;background:#f8fafc}
+.ov-view button{border:0;background:transparent;color:#475569;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit}
+.ov-view button.on{background:#4f46e5;color:#fff}
+/* Sales Overview view: fixed top bar with bell and user, content scrolls */
+.wf-body.dash-body>.ov{flex:1;min-height:0;gap:0}
+.ov-top{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 4px 12px}
+.ov-top-title{font-size:13px;font-weight:600;color:#7a8091}
+.ov-top-tools{display:flex;align-items:center;gap:10px}
+.ov-scroll{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:14px;padding:0 4px 4px 0}

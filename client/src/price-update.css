@@ -1,0 +1,38 @@
+/* Price Updates — on top of the Opening Stock Entry styles */
+.pu-up{color:#067647 !important}
+.pu-down{color:#b42318 !important}
+.pu-arrow{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.25;font-weight:700;color:#101828}
+.pu-arrow s{font-weight:400;color:#98a2b3;font-size:11.5px}
+.pu-arrow small{font-size:11px;font-weight:600}
+.pu-same{color:#667085}
+.pu-std{display:flex;flex-direction:column;gap:8px}
+.pu-std-head,.pu-std-row{display:grid;grid-template-columns:120px 1fr 1fr 80px;gap:12px;align-items:center}
+.pu-std-head strong{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:#667085}
+.pu-std-head strong:nth-child(n+2){text-align:right}
+.pu-std-row span{font-size:13px;font-weight:600;color:#344054}
+.pu-std-row em{font-style:normal;text-align:right;color:#475467;font-variant-numeric:tabular-nums}
+.pu-std-row input{border:1px solid #d0d5dd;border-radius:8px;padding:9px 11px;font-size:15px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.pu-std-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #c5dbff66}
+.pu-std-row small{text-align:right;color:#98a2b3;font-weight:600;font-size:12px}
+.pu-std-row.moved input{border-color:#84adff;background:#f5f8ff}
+.pu-std-row.moved small{color:#1d4ed8}
+.pu-grid thead th.pu-group{text-align:center;border-left:1px solid #e4e7ec}
+.pu-grid thead th.pu-sub{top:37px;font-size:10.5px;background:#fcfcfd}
+.pu-grid td.pu-cur{color:#667085;border-left:1px solid #f2f4f7}
+.pu-grid td input{width:92px}
+.pu-grid td.pu-moved input{border-color:#84adff;background:#f5f8ff;font-weight:600}
+.pu-grid td small{display:block;font-size:10.5px;color:#1d4ed8;font-weight:600}
+.pu-grid tr.pu-bad td{background:#fef3f2}
+.pu-changeby{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#475467;margin-left:auto}
+.pu-changeby select,.pu-changeby input{border:1px solid #d0d5dd;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff}
+.pu-changeby input{width:90px;text-align:right}
+.pu-master{display:grid;grid-template-columns:1.3fr repeat(3,1fr);gap:12px;align-items:end;padding:12px;border:1px solid #e4e7ec;border-radius:12px;background:#f8fafc}
+.pu-master div{display:flex;flex-direction:column;gap:3px}
+.pu-master div strong{font-size:13.5px;color:#101828}
+.pu-master div small{font-size:12px;color:#667085}
+.pu-master div select{margin-top:4px;border:1px solid #d0d5dd;border-radius:8px;padding:6px 8px;font-size:12.5px}
+.pu-master label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#344054}
+.pu-master label em{font-style:normal;font-weight:500;color:#667085}
+.pu-master input{border:1px solid #d0d5dd;border-radius:8px;padding:8px 10px;font-size:14px;text-align:right;font-variant-numeric:tabular-nums;background:#fff}
+.pu-master label.moved input{border-color:#84adff;background:#f5f8ff;font-weight:600}
+.pu-changeby .sg-btn{white-space:nowrap}

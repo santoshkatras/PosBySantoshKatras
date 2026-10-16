@@ -1,0 +1,26 @@
+.fb-back{position:fixed;inset:0;z-index:400;background:rgba(15,23,42,.42);backdrop-filter:blur(2px);display:grid;place-items:center;padding:16px;animation:fb-fade .12s ease}
+.fb-card{position:relative;width:min(420px,94vw);background:var(--fb-card,#fff);border-radius:16px;box-shadow:0 24px 60px rgba(15,23,42,.3);padding:24px 24px 18px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;overflow:hidden;font-family:Inter,General Sans,system-ui,sans-serif;color:#101828;animation:fb-pop .16s ease}
+.fb-icon{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;margin-bottom:4px}
+.fb-icon svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fb-card.question .fb-icon,.fb-card.info .fb-icon{background:#eef4ff;color:#2f6bff}
+.fb-card.danger .fb-icon{background:#fef3f2;color:#d92d20}
+.fb-card.success .fb-icon{background:#ecfdf3;color:#079455}
+.fb-card.error .fb-icon{background:#fef3f2;color:#d92d20}
+.fb-card h3{margin:0;font-size:17px;font-weight:700}
+.fb-card p{margin:0;color:#475467;font-size:14px;line-height:1.5}
+.fb-card small{color:#667085;font-size:12.5px}
+.fb-actions{display:flex;gap:10px;justify-content:center;margin-top:10px;width:100%}
+.fb-btn{flex:1;max-width:160px;border:1px solid #d0d5dd;background:#fff;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;color:#344054;font-family:inherit}
+.fb-btn:hover{background:#f9fafb}
+.fb-btn.primary{background:var(--accent,#2f6bff);border-color:var(--accent,#2f6bff);color:#fff}
+.fb-btn.primary:hover{filter:brightness(1.06)}
+.fb-btn.primary.danger{background:#d92d20;border-color:#d92d20}
+.fb-bar{position:absolute;left:0;bottom:0;height:3px;background:#12b76a;animation:fb-bar 2.2s linear forwards}
+.fb-toasts{position:fixed;right:18px;bottom:18px;z-index:410;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.fb-toast{display:flex;align-items:center;gap:10px;background:#101828;color:#fff;border-radius:12px;padding:10px 14px;font-size:13.5px;box-shadow:0 12px 30px rgba(0,0,0,.25);animation:fb-pop .16s ease;max-width:420px}
+.fb-toast svg{width:18px;height:18px;fill:none;stroke:#32d583;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.fb-toast.error svg{stroke:#f97066}
+.fb-toast.info svg{stroke:#84adff}
+@keyframes fb-fade{from{opacity:0}to{opacity:1}}
+@keyframes fb-pop{from{opacity:0;transform:scale(.96) translateY(6px)}to{opacity:1;transform:none}}
+@keyframes fb-bar{from{width:100%}to{width:0}}

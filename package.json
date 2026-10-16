@@ -9,14 +9,15 @@
   },
   "scripts": {
     "dev": "node server/start.mjs",
-    "start": "NODE_ENV=production node server/start.mjs",
+    "start": "npm run build && node server/start.mjs --production",
     "build": "vite build --config client/vite.config.js",
-    "test": "node --test server/isolation.test.mjs",
+    "test": "node --test server/isolation.test.mjs server/service.test.mjs",
     "seed": "node server/seed.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.7.0",
     "express": "^4.21.2",
+    "pg": "^8.23.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.8.2",

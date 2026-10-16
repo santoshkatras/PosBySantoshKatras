@@ -1,0 +1,208 @@
+.search-select {
+  position: relative;
+}
+
+.search-select ul,
+.chip-menu ul {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.search-select ul {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  box-shadow: 0 12px 24px rgba(16, 24, 40, 0.12);
+}
+
+.search-select button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #1b2433;
+  font-weight: 600;
+}
+
+.search-select button:hover,
+.search-select button.on,
+.chip-menu button:hover,
+.chip-menu button.on {
+  background: #eaf3ff;
+  color: #2f7cf6;
+}
+
+.search-select button,
+.chip-menu button {
+  white-space: nowrap;
+}
+
+.search-select .empty,
+.chip-menu .empty {
+  padding: 8px 10px;
+  color: #98a2b3;
+  font-size: 13px;
+}
+
+.chip-select {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chip-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 40px;
+  padding: 0 28px 0 6px;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #fff;
+  cursor: text;
+  position: relative;
+  overflow: hidden;
+}
+
+.chip-scroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 4px 8px 4px 10px;
+  border-radius: 999px;
+  background: #2f7cf6;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.chip.more {
+  background: #dbe8ff;
+  color: #1d4ed8;
+}
+
+.chip i {
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.chip-count {
+  margin-left: auto;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #16345c;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chip-placeholder {
+  color: #98a2b3;
+  font-weight: 600;
+  padding-left: 6px;
+}
+
+.chip-caret {
+  position: absolute;
+  right: 12px;
+  color: #667085;
+}
+
+.chip-required {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  height: 0;
+  width: 0;
+}
+
+.chip-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(16, 24, 40, 0.12);
+  padding: 8px;
+}
+
+.im .im-field .chip-menu input {
+  height: 34px;
+  margin-bottom: 6px;
+}
+
+.im .im-field .chip-required {
+  position: absolute;
+  width: 0;
+  height: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chip-menu input {
+  width: 100%;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+
+.chip-menu ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.chip-menu button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.chip-menu button:hover {
+  background: #eaf3ff;
+  color: #2f7cf6;
+}

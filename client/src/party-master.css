@@ -1,0 +1,25 @@
+/* Customer / Supplier master — extras on top of the Product list and Item Master styles */
+.workforce .pm-ok{margin:0 0 4px;padding:9px 14px;border:1px solid #abefc6;background:#ecfdf3;color:#067647;border-radius:10px;font-size:13px;font-weight:600}
+.workforce .il-filters .pm-gst-search{flex:0 1 250px;min-width:200px}
+.workforce .il-filters label.il-search.pm-gst-search input{padding-left:64px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em;text-transform:uppercase}
+.workforce .il-filters label.il-search.pm-gst-search input::placeholder{font-family:Inter,system-ui,sans-serif;letter-spacing:0;text-transform:none}
+.pm-gst-tag{position:absolute;left:8px;top:50%;transform:translateY(-50%);background:#eef4ff;color:#3538cd;font-size:10.5px;font-weight:800;letter-spacing:.04em;padding:3px 6px;border-radius:5px;pointer-events:none}
+.pm-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;letter-spacing:.02em}
+.pm-type{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.pm-type.registered{background:#ecfdf3;color:#067647}
+.pm-type.unregistered{background:#f2f4f7;color:#344054}
+.pm-type.composition{background:#fdf2fa;color:#c11574}
+.pm .pm-readonly{background:#f2f4f7 !important;color:#344054}
+.pm .pm-upper{text-transform:uppercase;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em}
+.pm .im-field input:disabled,.pm .im-field select:disabled{background:#f2f4f7;color:#98a2b3;cursor:not-allowed}
+.pm .im-field textarea{width:100%;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:8px;padding:9px 11px;font:inherit;font-size:13.5px;resize:vertical}
+.pm .im-block>.im-field{margin-top:12px}
+.pm-matches{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.pm-matches button{text-align:left;border:1px dashed #84adff;background:#f5f8ff;color:#1d4ed8;border-radius:8px;padding:8px 12px;font-size:12.5px;cursor:pointer}
+.pm-matches button:hover{background:#eef4ff}
+.pm .im-field .pm-balance{display:flex;gap:6px;width:100%}
+.pm .im-field .pm-balance input{flex:1 1 auto;width:auto;min-width:0}
+.pm .im-field .pm-balance select{flex:0 0 78px;width:78px;min-width:0}
+.pm [data-section]{scroll-margin-top:96px}
+.pm .im-block>.im-field textarea{min-height:0;height:auto}
+.workforce .il-head .il-btn{white-space:nowrap}

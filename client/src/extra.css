@@ -1,3 +1,62 @@
+:root {
+  --ink: #1b2433;
+  --muted: #667085;
+  --line: #e6ebf2;
+  --paper: #f4f6fb;
+  --panel: #ffffff;
+  --accent: #2f7cf6;
+  --accent-soft: #eaf3ff;
+  --navy: #0e2344;
+  --navy-2: #16345c;
+  --green: #16a34a;
+  --red: #ef4444;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+.shell.hrpay,
+.shell.hrpay .workspace,
+.shell.hrpay .content {
+  background: var(--paper);
+}
+
+.shell.hrpay .sidebar,
+.shell.hrpay .hr-brand,
+.shell.hrpay .hr-side-foot {
+  background: var(--navy);
+}
+
+.shell.hrpay .hr-org-card,
+.shell.hrpay .hr-side-foot select,
+.shell.hrpay .hr-side-foot button {
+  background: var(--navy-2);
+}
+
+.shell.hrpay .sidebar nav a.active,
+.shell.hrpay .sidebar nav button.nav-parent.active,
+.shell.hrpay .sk-mark,
+.wf-avatar,
+.hr-menu,
+.login-submit,
+.btn.primary,
+.wf-page button.on,
+.app-tabbar a.active,
+.app-tabbar button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.shell.hrpay .sidebar nav a.nav-sub.active {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: #fff;
+  box-shadow: inset 2px 0 #9ec2ff;
+}
+
+.btn.primary:hover,
+.login-submit:hover {
+  background: #1d6ae0;
+  border-color: #1d6ae0;
+}
+
 .shell.hrpay .hr-brand-lockup {
   display: flex;
   align-items: center;
@@ -98,9 +157,6 @@
   height: auto;
   overflow: visible;
 }
-.shell.hrpay .nav-children:not(.open) {
-  display: none;
-}
 .shell.hrpay .sidebar nav a.nav-sub {
   opacity: 1;
   transform: none;
@@ -139,3 +195,29 @@
     display: none;
   }
 }
+.matrix-sheet {
+  overflow-x: auto;
+}
+.matrix-sheet table {
+  min-width: 760px;
+}
+.matrix-sheet td input,
+.matrix-sheet td select {
+  min-width: 120px;
+}
+.matrix-modal {
+  width: min(1100px, 100%);
+}
+
+
+/* Smooth sidebar accordion: slide groups open and closed */
+.shell .sidebar .nav-children{display:grid;grid-template-rows:0fr;height:auto;overflow:hidden;margin-top:0;margin-bottom:0;opacity:.6;transition:grid-template-rows .45s cubic-bezier(.4,0,.2,1),margin .45s cubic-bezier(.4,0,.2,1),opacity .45s ease}
+.shell .sidebar .nav-children.open{grid-template-rows:1fr;margin-top:2px;margin-bottom:6px;opacity:1}
+.shell .sidebar .nav-children-inner{min-height:0;overflow:hidden;visibility:visible;transition:visibility 0s}
+.shell .sidebar .nav-children:not(.open) .nav-children-inner{visibility:hidden;transition:visibility 0s .45s}
+.shell .sidebar a.nav-sub{transition:opacity .35s ease .12s,transform .35s ease .12s,background .2s ease,color .2s ease}
+.shell .sidebar .nav-children:not(.open) a.nav-sub{transition:opacity .2s ease,transform .2s ease}
+.shell .sidebar .nav-caret{transition:transform .45s cubic-bezier(.4,0,.2,1)}
+@media (prefers-reduced-motion:reduce){.shell .sidebar .nav-children,.shell .sidebar a.nav-sub,.shell .sidebar .nav-caret{transition:none}}.choice-row.demo-row{flex-wrap:nowrap}.choice-row.demo-row .choice{flex:1;white-space:nowrap;min-width:0;padding-left:10px;padding-right:10px}
+@media (max-width:1080px){.shell.hrpay .workspace{grid-column:1}}
+.fixed-tag{font-style:normal;margin-left:8px;background:#fff4e5;color:#b54708;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700}

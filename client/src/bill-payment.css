@@ -1,0 +1,50 @@
+/* Sales Bill: offers bar + payment collection */
+.pay-offers{display:flex;flex-wrap:wrap;gap:6px;padding:8px 16px;border-top:1px solid #eef1f6;background:#f6fef9;align-items:center}
+.pay-chip{display:inline-flex;gap:6px;align-items:center;background:#ecfdf3;border:1px solid #abefc6;color:#067647;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:600}
+.pay-chip strong{color:#05603a}
+.pay-chip.cp{background:#f4f3ff;border-color:#d9d6fe;color:#5925dc}
+.pay-tip{font-size:12px;color:#b54708;background:#fffaeb;border:1px solid #fedf89;border-radius:999px;padding:3px 10px}
+.pay-member{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;border:1px solid #d0d5dd;border-radius:999px;padding:2px 10px 2px 2px;background:#fff}
+.pay-member b,.pay-mem b{color:#fff;border-radius:999px;padding:1px 8px;font-size:11px}
+.ose-pop.pay-pop{width:min(1080px,96vw)}
+.pay-grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+.pay-left{display:flex;flex-direction:column;gap:10px}
+.pay-sum{background:#f9fafb;border:1px solid #eaecf0;border-radius:12px;padding:10px 14px}
+.pay-sum p{display:flex;justify-content:space-between;margin:0;padding:4px 0;font-size:13.5px}
+.pay-sum p.save strong{color:#067647}
+.pay-sum p.grand{border-top:1px dashed #d0d5dd;margin-top:4px;padding-top:8px;font-size:17px}
+.pay-applied{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.pay-applied li{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;background:#ecfdf3;border-radius:8px;padding:6px 10px;color:#05603a}
+.pay-applied small{display:block;color:#067647;font-weight:400}
+.pay-box{border:1px solid #eaecf0;border-radius:12px;padding:10px 12px}
+.pay-box h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#667085}
+.pay-inline{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.pay-inline input{flex:1;min-width:110px;border:1px solid #d0d5dd;border-radius:8px;padding:7px 9px;font-family:inherit;font-size:13px}
+.pay-cp-on{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#f4f3ff;border-radius:8px;padding:6px 10px;font-size:13px;color:#5925dc}
+.pay-err{display:block;color:#b42318;font-size:12px;margin-top:4px}
+.pay-ok{display:block;color:#067647;font-size:12px}
+.pay-muted{color:#98a2b3;font-size:12px;display:block}
+.pay-mem{margin:0 0 8px;font-size:13px}
+.pay-mem em{color:#b54708;font-style:normal}
+.pay-tenders{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px;margin-bottom:12px}
+.pay-tenders button{--tc:#667085;border:1px solid #e4e7ec;border-left:4px solid var(--tc);background:#fff;border-radius:10px;padding:9px 10px;text-align:left;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:2px}
+.pay-tenders button:hover:not(:disabled){box-shadow:0 2px 10px rgba(16,24,40,.08);border-color:var(--tc)}
+.pay-tenders button:disabled{opacity:.45;cursor:not-allowed}
+.pay-tenders strong{font-size:13px}
+.pay-tenders small{font-size:11px;color:#667085}
+.pay-rows{width:100%;border-collapse:collapse;font-size:13px}
+.pay-rows th{text-align:left;font-size:11px;text-transform:uppercase;color:#667085;padding:6px;border-bottom:1px solid #eaecf0}
+.pay-rows td{padding:6px;border-bottom:1px solid #f2f4f7;vertical-align:middle}
+.pay-rows .num{text-align:right}
+.pay-rows td.num input{width:110px;text-align:right}
+.pay-rows input{border:1px solid #d0d5dd;border-radius:8px;padding:6px 8px;font-family:inherit;font-size:13px;width:100%}
+.pay-rows .tt-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px}
+.pay-term{margin-left:8px;border:1px solid #d9d6fe;background:#f4f3ff;color:#5925dc;border-radius:6px;font-size:11px;padding:2px 7px;cursor:pointer;font-family:inherit}
+.pay-x{border:0;background:#fef3f2;color:#b42318;width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:16px}
+.pay-empty{text-align:center;padding:18px !important}
+.pay-due{display:flex;gap:18px;align-items:center;justify-content:flex-end;margin-top:10px;padding:10px 12px;border-radius:10px;background:#fef3f2;color:#b42318;font-size:14px;flex-wrap:wrap}
+.pay-due.ok{background:#ecfdf3;color:#067647}
+.pay-due.change{background:#eff8ff;color:#175cd3}
+.pay-tips{list-style:none;padding:0;margin:10px 0 0;font-size:12.5px;color:#b54708;display:flex;flex-direction:column;gap:4px}
+.pay-print{display:flex;gap:6px;align-items:center;font-size:13px;margin-right:auto;white-space:nowrap;flex:none}
+@media (max-width:900px){.pay-grid{grid-template-columns:1fr}}

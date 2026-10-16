@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { newId } from './ids.mjs';
 
 const require = createRequire(import.meta.url);
@@ -17,8 +18,8 @@ function same(left, right) {
   return String(left ?? '') === String(right ?? '');
 }
 
-export function createMemoryStore() {
-  const tables = new Map();
+export function createMemoryStore(initial = null, onChange = null) {
+  const tables = new Map(initial ? Object.entries(initial) : []);
   return {
     kind: 'memory',
     async ping() {
@@ -34,13 +35,17 @@ export function createMemoryStore() {
       const bucket = tables.get(table) || [];
       bucket.push(row);
       tables.set(table, bucket);
+      onChange?.(tables, table, row);
       return clone(row);
     },
     async update(table, id, patch) {
       const bucket = tables.get(table) || [];
       const row = bucket.find((item) => same(item.id, id));
       if (!row) return null;
-      Object.assign(row, normalize({ ...row, ...patch, id: row.id, row_key: row.row_key }));
+      const next = normalize({ ...row, ...patch, id: row.id, row_key: row.row_key });
+      for (const key of Object.keys(row)) delete row[key];
+      Object.assign(row, next);
+      onChange?.(tables, table, row);
       return clone(row);
     },
   };
@@ -66,17 +71,26 @@ function unwrap(data, table) {
   return list.map((item) => normalize(item?.[table] || item));
 }
 
+function packageRoot(candidate) {
+  const beside = join(dirname(candidate), 'node_modules', 'zcatalyst-cli');
+  if (existsSync(join(beside, 'lib', 'authentication', 'credential.js'))) return beside;
+  let root = realpathSync(candidate);
+  if (root.endsWith('.js')) root = dirname(dirname(dirname(root)));
+  if (existsSync(join(root, 'lib', 'authentication', 'credential.js'))) return root;
+  return null;
+}
+
 function cliPackage() {
-  const names = process.platform === 'win32' ? ['catalyst.cmd', 'catalyst'] : ['catalyst'];
+  const names = process.platform === 'win32' ? ['catalyst.cmd', 'catalyst', 'catalyst.ps1'] : ['catalyst'];
   const dirs = (process.env.PATH || '').split(process.platform === 'win32' ? ';' : ':');
   if (process.env.HOME) dirs.push(join(process.env.HOME, '.local', 'bin'));
+  if (process.env.APPDATA) dirs.push(join(process.env.APPDATA, 'npm'));
   for (const dir of dirs) {
     for (const name of names) {
       const candidate = join(dir, name);
       if (!existsSync(candidate)) continue;
-      let root = realpathSync(candidate);
-      if (root.endsWith('.js')) root = dirname(dirname(dirname(root)));
-      if (existsSync(join(root, 'lib', 'authentication', 'credential.js'))) return root;
+      const root = packageRoot(candidate);
+      if (root) return root;
     }
   }
   throw new Error('CATALYST_LOGIN');
@@ -98,6 +112,9 @@ async function accessToken() {
 
 function createRestClient() {
   let tokenPromise;
+  function clearToken() {
+    tokenPromise = null;
+  }
   async function headers() {
     if (!tokenPromise) tokenPromise = accessToken();
     const token = await tokenPromise;
@@ -109,17 +126,19 @@ function createRestClient() {
       'Content-Type': 'application/json',
     };
   }
-  async function send(method, path, body) {
+  async function send(method, path, body, retry = true) {
     const response = await fetch(`https://api.catalyst.zoho.com/baas/v1/project/${PROJECT_ID}${path}`, {
       method,
       headers: await headers(),
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload.status === 'failure') {
-      const message = payload.data?.message || payload.message || `Catalyst request failed (${response.status})`;
-      throw new Error(message);
+    const message = payload.data?.message || payload.message || `Catalyst request failed (${response.status})`;
+    if (retry && /oauth token/i.test(message)) {
+      clearToken();
+      return send(method, path, body, false);
     }
+    if (!response.ok || payload.status === 'failure') throw new Error(message);
     return payload.data;
   }
   return {
@@ -200,7 +219,124 @@ export function createCatalystStore() {
   };
 }
 
+// File store: the memory store saved to one JSON file (for a single server with its own disk,
+// e.g. an AWS Lightsail / EC2 instance). Writes are batched and atomic (temp file + rename).
+export function createFileStore(file) {
+  mkdirSync(dirname(file), { recursive: true });
+  let initial = null;
+  if (existsSync(file)) initial = JSON.parse(readFileSync(file, 'utf8') || '{}');
+  let timer = null;
+  let latest = null;
+  const flush = () => {
+    timer = null;
+    if (!latest) return;
+    const tmp = `${file}.tmp`;
+    writeFileSync(tmp, JSON.stringify(Object.fromEntries(latest)));
+    renameSync(tmp, file);
+  };
+  const store = createMemoryStore(initial, (tables) => { latest = tables; if (!timer) timer = setTimeout(flush, 300); });
+  store.kind = 'file';
+  store.flush = () => { if (timer) clearTimeout(timer); flush(); };
+  return store;
+}
+
+// SQLite store (default): every record lives in data/stockkeep.sqlite (table skpos_records, one row per
+// record, JSON data). Reads come from an in-memory copy loaded at start; every insert / update is written
+// to SQLite immediately, so nothing is lost when the app stops. Uses Node's built-in node:sqlite.
+export async function createSqliteStore(file) {
+  const { DatabaseSync } = await import('node:sqlite');
+  mkdirSync(dirname(file), { recursive: true });
+  const db = new DatabaseSync(file);
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA synchronous = NORMAL;
+    CREATE TABLE IF NOT EXISTS skpos_records (
+      tbl TEXT NOT NULL,
+      id TEXT NOT NULL,
+      company_id TEXT,
+      data TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tbl, id)
+    );
+    CREATE INDEX IF NOT EXISTS skpos_records_company ON skpos_records (tbl, company_id);
+  `);
+  const initial = {};
+  for (const row of db.prepare('SELECT tbl, data FROM skpos_records ORDER BY rowid').all()) {
+    (initial[row.tbl] ||= []).push(JSON.parse(row.data));
+  }
+  const upsert = db.prepare(`INSERT INTO skpos_records (tbl, id, company_id, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT (tbl, id) DO UPDATE SET company_id = excluded.company_id, data = excluded.data, updated_at = excluded.updated_at`);
+  const store = createMemoryStore(initial, (_tables, table, row) => {
+    const now = new Date().toISOString();
+    upsert.run(table, String(row.id), row.company_id == null ? null : String(row.company_id), JSON.stringify(row), now, now);
+  });
+  store.kind = 'sqlite';
+  store.file = file;
+  store.flush = () => {};
+  store.close = () => db.close();
+  return store;
+}
+
+// Postgres store (Supabase): same layout as the SQLite store — one table skpos_records with JSON data.
+// Reads come from an in-memory copy loaded at start; every insert / update is written to Postgres before
+// the call returns. Run ONE server instance against a database (the cache is per process).
+// Set DATABASE_URL to the Supabase "Session pooler" connection string.
+export async function createPostgresStore(url) {
+  const { default: pg } = await import('pg');
+  const pool = new pg.Pool({
+    connectionString: url,
+    ssl: /localhost|127\.0\.0\.1/.test(url) ? false : { rejectUnauthorized: false },
+    max: 5,
+  });
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS skpos_records (
+      tbl TEXT NOT NULL,
+      id TEXT NOT NULL,
+      company_id TEXT,
+      data JSONB NOT NULL,
+      seq BIGSERIAL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (tbl, id)
+    );
+    CREATE INDEX IF NOT EXISTS skpos_records_company ON skpos_records (tbl, company_id);
+    ALTER TABLE skpos_records ENABLE ROW LEVEL SECURITY;
+  `);
+  const initial = {};
+  const { rows } = await pool.query('SELECT tbl, data FROM skpos_records ORDER BY seq');
+  for (const row of rows) (initial[row.tbl] ||= []).push(row.data);
+  const save = (table, row) => pool.query(
+    `INSERT INTO skpos_records (tbl, id, company_id, data) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (tbl, id) DO UPDATE SET company_id = EXCLUDED.company_id, data = EXCLUDED.data, updated_at = now()`,
+    [table, String(row.id), row.company_id == null ? null : String(row.company_id), JSON.stringify(row)],
+  );
+  const store = createMemoryStore(initial);
+  const memInsert = store.insert.bind(store);
+  const memUpdate = store.update.bind(store);
+  store.insert = async (table, input) => {
+    const row = await memInsert(table, input);
+    await save(table, row);
+    return row;
+  };
+  store.update = async (table, id, patch) => {
+    const row = await memUpdate(table, id, patch);
+    if (row) await save(table, row);
+    return row;
+  };
+  store.kind = 'postgres';
+  store.ping = async () => { await pool.query('SELECT 1'); return true; };
+  store.flush = () => {};
+  store.close = () => pool.end();
+  return store;
+}
+
 export async function openStore(options = {}) {
-  if (options.store === 'memory') return createMemoryStore();
+  const onCatalyst = Boolean(process.env.X_ZOHO_CATALYST_LISTEN_PORT);
+  const kind = options.store || process.env.STORE || (onCatalyst ? 'catalyst' : process.env.DATABASE_URL ? 'postgres' : 'sqlite');
+  if (kind === 'memory') return createMemoryStore();
+  if (kind === 'postgres') return createPostgresStore(process.env.DATABASE_URL);
+  if (kind === 'file') return createFileStore(process.env.DATA_FILE || join(process.cwd(), 'data', 'skpos-data.json'));
+  if (kind === 'sqlite') return createSqliteStore(process.env.SQLITE_FILE || join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'stockkeep.sqlite'));
   return createCatalystStore();
 }

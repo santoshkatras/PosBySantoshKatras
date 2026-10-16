@@ -1,0 +1,31 @@
+/* Transactions → Wastage Entry */
+.ws-page{display:block}
+.ws-tabs{margin-bottom:10px}
+.ws-line-top{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.ws-line-top label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:700;color:#475467;text-transform:uppercase;letter-spacing:.03em}
+.ws-line-top label.grow{flex:1;min-width:200px}
+.ws-line-top select,.ws-line-top input{border:1px solid #d0d5dd;border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;text-transform:none;font-weight:400;min-width:200px}
+.ws-window td select.ws-reason{width:100%;border:1px solid #d0d5dd;border-radius:7px;padding:5px 6px;font-family:inherit;font-size:12.5px;max-width:none}
+.ws-window td small.ws-remark{color:#b54708}
+.ws-expired td{background:#fef3f2}
+.ws-exp-tag{display:inline-block;margin-left:6px;background:#fee4e2;color:#b42318;border-radius:99px;padding:0 7px;font-size:10.5px;font-weight:700}
+.ws-recovery{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#475467}
+.ws-recovery input{width:96px;border:1px solid #d0d5dd;border-radius:7px;padding:5px 8px;text-align:right;font-family:inherit}
+.ws-loss strong{color:#b42318 !important}
+.ws-abn{font-style:normal;margin-left:6px;background:#fef3f2;color:#b42318;border-radius:99px;padding:1px 7px;font-size:10.5px;font-weight:700}
+.ws-reasons{max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#475467}
+.ws-summary{display:inline-flex;flex-wrap:wrap;gap:6px;margin-left:auto;font-size:12px}
+.ws-summary span{background:#f9fafb;border:1px solid #eaecf0;border-radius:999px;padding:3px 10px;color:#475467}
+.ws-summary strong{color:#b42318;margin-left:4px}
+.ws-types{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px}
+.ws-type{border:1px solid #e4e7ec;border-radius:12px;padding:10px 12px;background:#fff;display:flex;flex-direction:column;gap:8px}
+.ws-type.off{opacity:.6}
+.ws-type-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ws-type-head>input{flex:1 1 100%;min-width:0;border:1px solid #d0d5dd;border-radius:8px;padding:7px 9px;font-family:inherit;font-weight:600;font-size:13.5px}
+.ws-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ws-chips span{display:inline-flex;align-items:center;gap:4px;background:#f2f4f7;border-radius:999px;padding:3px 4px 3px 10px;font-size:12.5px;color:#344054}
+.ws-chips span button{border:0;background:rgba(0,0,0,.07);border-radius:50%;width:18px;height:18px;cursor:pointer;line-height:1}
+.ws-chips input{border:1px dashed #d0d5dd;border-radius:999px;padding:4px 10px;font-family:inherit;font-size:12.5px;min-width:150px}
+
+.ws-type-head .pay-x{margin-left:auto}
+.ws-type.new{border-color:#2f6bff;box-shadow:0 0 0 3px #eef4ff}

@@ -1,0 +1,157 @@
+/* ============================================================
+   SKPOS tables and filters — one look for every list and table
+   ============================================================ */
+
+/* ---------- page stays still; the table scrolls ---------- */
+/* Fixed app frame: sidebar, header and footer never move. Only the page
+   body (or the table inside it) scrolls. */
+@media (min-width:901px){
+  .shell.hrpay{height:100vh;height:100dvh;overflow:hidden}
+  .shell.hrpay .workspace{overflow:hidden}
+  .shell.hrpay .content{height:100%;box-sizing:border-box;display:flex;flex-direction:column;padding-bottom:12px}
+  .shell.hrpay .workforce{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px}
+  .shell.hrpay .wf-head{flex:none}
+  .shell.hrpay .wf-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;display:grid;grid-auto-rows:max-content;gap:12px;align-content:start;padding:0 4px 4px 0;margin-right:-4px}
+  .shell.hrpay .wf-body.fit-locked{overflow:hidden}
+  .shell.hrpay .wf-body::-webkit-scrollbar{width:10px;height:10px}
+  .shell.hrpay .wf-body::-webkit-scrollbar-thumb{background:#c9d2e0;border-radius:10px;border:2px solid #f3f6fb}
+  .shell.hrpay .wf-body::-webkit-scrollbar-thumb:hover{background:#9aa8bd}
+  .shell.hrpay .wf-body::-webkit-scrollbar-track{background:transparent}
+}
+.wf-body{display:grid;gap:12px;min-width:0}
+.wf-body>*{min-width:0}
+.workforce .il.fit-page{align-items:stretch;min-height:0}
+.workforce .il.fit-page .il-main{display:flex;flex-direction:column;min-height:0;height:100%;overflow:hidden}
+.workforce .il.fit-page .il-table-wrap,.workforce .il.fit-page .il-grid-wrap{flex:1 1 auto;min-height:0}
+.workforce .il.fit-page .il-detail{height:100%;overflow:auto;position:static}
+@media (max-width:899px){.workforce .il.fit-page .il-main,.workforce .il.fit-page .il-detail{height:auto}}
+
+/* ---------- scrollbars ---------- */
+.workforce .il-table-wrap,.workforce .table-wrap,.svc .table-wrap,.vt-scroll,.sg-scroll{scrollbar-width:thin;scrollbar-color:#c4ccd8 #f2f4f7}
+.workforce .il-table-wrap::-webkit-scrollbar,.workforce .table-wrap::-webkit-scrollbar,.vt-scroll::-webkit-scrollbar,.sg-scroll::-webkit-scrollbar{width:10px;height:10px}
+.workforce .il-table-wrap::-webkit-scrollbar-track,.workforce .table-wrap::-webkit-scrollbar-track,.vt-scroll::-webkit-scrollbar-track,.sg-scroll::-webkit-scrollbar-track{background:#f2f4f7;border-radius:10px}
+.workforce .il-table-wrap::-webkit-scrollbar-thumb,.workforce .table-wrap::-webkit-scrollbar-thumb,.vt-scroll::-webkit-scrollbar-thumb,.sg-scroll::-webkit-scrollbar-thumb{background:#c4ccd8;border-radius:10px;border:2px solid #f2f4f7}
+.workforce .il-table-wrap::-webkit-scrollbar-thumb:hover,.workforce .table-wrap::-webkit-scrollbar-thumb:hover{background:#98a2b3}
+.workforce .il-table-wrap::-webkit-scrollbar-corner,.workforce .table-wrap::-webkit-scrollbar-corner{background:#f2f4f7}
+
+/* ---------- list tables (Item Master, Price list, Barcodes, documents) ---------- */
+.workforce .il-main{padding:16px 16px 0}
+.workforce .il-head{padding-bottom:12px;border-bottom:1px solid #eef1f6}
+.workforce .il-table-wrap{overflow:auto;border:1px solid #e4e7ec;border-radius:10px;background:#fff;overscroll-behavior:contain}
+.workforce .il-table-wrap table{width:100%;min-width:max-content;border-collapse:separate;border-spacing:0}
+.workforce .il-table-wrap thead th{position:sticky;top:0;z-index:3;background:#f8fafc;color:#475467;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:10px 12px;border-bottom:1px solid #e4e7ec;white-space:nowrap;text-align:left}
+.workforce .il-table-wrap tbody td{padding:9px 12px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1f2937;white-space:nowrap;background:#fff}
+.workforce .il-table-wrap tbody tr:nth-child(even) td{background:#fcfcfd}
+.workforce .il-table-wrap tbody tr:hover td{background:#f5f9ff}
+.workforce .il-table-wrap tbody tr.on td{background:#eef4ff}
+.workforce .il-table-wrap tbody tr.on td:first-child{box-shadow:inset 3px 0 var(--accent)}
+.workforce .il-table-wrap th.num,.workforce .il-table-wrap td.num{text-align:right;font-variant-numeric:tabular-nums}
+.workforce .il-table-wrap thead th:first-child,.workforce .il-table-wrap tbody td:first-child{padding-left:14px}
+.workforce .il-table-wrap .empty{padding:40px 12px;text-align:center;color:#98a2b3;white-space:normal}
+.workforce .il-table-wrap input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
+
+/* gear column (last column, stays visible while scrolling sideways) */
+.workforce .il-table-wrap th.col-set,.workforce .il-table-wrap td.col-set{position:sticky;right:0;width:44px;min-width:44px;max-width:44px;padding:0 6px !important;text-align:center;border-left:1px solid #eef1f6}
+.workforce .il-table-wrap th.col-set{z-index:4;background:#f8fafc}
+.col-gear{display:inline-grid;place-items:center;width:28px;height:28px;border:1px solid transparent;border-radius:7px;background:transparent;color:#667085;cursor:pointer;padding:0;vertical-align:middle}
+.col-gear svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.col-gear:hover,.col-gear.on{border-color:#d0d5dd;background:#fff;color:var(--accent)}
+.col-panel{position:fixed;z-index:1000;width:240px;background:#fff;border:1px solid #e4e7ec;border-radius:12px;box-shadow:0 16px 36px rgba(16,24,40,.16);overflow:hidden;font-size:13px}
+.col-panel header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #eef1f6}
+.col-panel header strong{color:#101828;font-size:13px}
+.col-panel header span{color:#98a2b3;font-size:12px}
+.col-list{max-height:300px;overflow:auto;padding:6px}
+.col-list label{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;cursor:pointer;color:#344054;font-weight:500;text-transform:none;letter-spacing:0}
+.col-list label:hover{background:#f5f9ff}
+.col-list input{width:15px;height:15px;accent-color:var(--accent)}
+.col-panel footer{display:flex;justify-content:space-between;gap:6px;padding:8px 10px;border-top:1px solid #eef1f6;background:#fcfcfd}
+.col-panel footer button{border:0;background:none;color:var(--accent);font-weight:700;font-size:12.5px;cursor:pointer;padding:4px 6px;border-radius:6px}
+.col-panel footer button:hover{background:#eef4ff}
+
+/* footer: totals and paging at the bottom of the table */
+.workforce .il-pager{flex-shrink:0;display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0;padding:10px 2px 14px;color:#667085;font-size:13px}
+.workforce .il-total{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;color:#475467}
+.workforce .il-total strong{color:#101828;font-size:14px}
+.workforce .il-total em{font-style:normal;color:#98a2b3;padding-left:10px;border-left:1px solid #e4e7ec}
+.workforce .il-pager div{display:flex;gap:6px;align-items:center}
+.workforce .il-pager button{min-width:32px;height:32px;border-radius:8px;border:1px solid #e4e7ec;background:#fff;color:#344054;cursor:pointer;font-weight:600}
+.workforce .il-pager button:hover{border-color:var(--accent);color:var(--accent)}
+.workforce .il-pager button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.workforce .il-pager select{height:32px;border:1px solid #e4e7ec;border-radius:8px;padding:0 8px;background:#fff;color:#344054}
+
+/* ---------- filter bar ---------- */
+.workforce .il-filters{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0;position:relative}
+.workforce .il-search{position:relative;display:flex;align-items:center;flex:0 1 380px;min-width:220px;gap:0}
+.workforce .il-search svg{position:absolute;left:11px;width:16px;height:16px;fill:none;stroke:#98a2b3;stroke-width:2;stroke-linecap:round;pointer-events:none}
+.workforce .il-filters .il-search input{width:100%;height:36px;border:1px solid #d0d5dd;border-radius:8px;padding:0 30px 0 34px;background:#fff;color:#101828;font-size:13px;font-weight:500}
+.workforce .il-filters .il-search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #c5dbff66}
+.workforce .il-search-x{position:absolute;right:6px;border:0;background:none;color:#98a2b3;font-size:17px;cursor:pointer;padding:2px 6px;border-radius:6px}
+.workforce .il-search-x:hover{color:#344054;background:#f2f4f7}
+.workforce .il-filter-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 12px;border:1px solid #d0d5dd;border-radius:8px;background:#fff;color:#344054;font-size:13px;font-weight:600;cursor:pointer}
+.workforce .il-filter-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+.workforce .il-filter-btn:hover,.workforce .il-filter-btn.on{border-color:var(--accent);color:var(--accent);background:#f5f9ff}
+.workforce .il-count{display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--accent);color:#fff;font-size:11px;font-weight:700}
+.workforce .il-clear{border:0;background:none;color:#667085;font-size:12.5px;font-weight:600;cursor:pointer;padding:6px 8px;border-radius:6px}
+.workforce .il-clear:hover{color:#b42318;background:#fef3f2}
+.workforce .il-chips{display:flex;flex-wrap:wrap;gap:6px;flex-basis:100%}
+.workforce .il-chip{display:inline-flex;align-items:center;gap:5px;height:28px;border:1px solid #c7d7fe;border-radius:999px;padding:0 10px;background:#eef4ff;color:#1d4ed8;font-size:12px;font-weight:600;cursor:pointer}
+.workforce .il-chip span{color:#475467;font-weight:500}
+.workforce .il-chip i{font-style:normal;font-size:14px;margin-left:2px;opacity:.7}
+.workforce .il-chip:hover i{opacity:1}
+.workforce .il-filter-pop{position:absolute;z-index:20;top:calc(100% + 6px);left:0;width:min(520px,calc(100vw - 40px));display:block;padding:0;background:#fff;border:1px solid #e4e7ec;border-radius:12px;box-shadow:0 16px 36px rgba(16,24,40,.16);overflow:hidden}
+.workforce .il-filter-pop header{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid #eef1f6}
+.workforce .il-filter-pop header strong{color:#101828;font-size:13.5px}
+.workforce .il-filter-pop header span{color:#98a2b3;font-size:12px}
+.workforce .il-filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px}
+.workforce .il-filter-grid label{display:flex;flex-direction:column;gap:5px;color:#475467;font-size:12px;font-weight:600}
+.workforce .il-filter-grid select{height:36px;border:1px solid #d0d5dd;border-radius:8px;padding:0 10px;background:#fff;color:#101828;font-size:13px}
+.workforce .il-filter-pop footer{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:1px solid #eef1f6;background:#fcfcfd}
+@media (max-width:640px){.workforce .il-filter-grid{grid-template-columns:1fr}.workforce .il-search{flex-basis:100%}}
+
+/* ---------- every other table in the app ---------- */
+.workforce .data-grid .table-wrap,.svc .data-grid .table-wrap{max-height:calc(100vh - 250px);overflow:auto;overscroll-behavior:contain}
+.workforce .data-grid table{border-collapse:separate;border-spacing:0;width:100%}
+.workforce .data-grid thead th{position:sticky;top:0;z-index:2;background:#f8fafc;color:#475467;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:10px 12px;border-bottom:1px solid #e4e7ec;white-space:nowrap;text-align:left}
+.workforce .data-grid tbody td{padding:9px 12px;border-bottom:1px solid #f2f4f7;font-size:13px;vertical-align:middle}
+.workforce .data-grid tbody tr:nth-child(even) td{background:#fcfcfd}
+.workforce .data-grid tbody tr:hover td{background:#f5f9ff}
+.workforce .data-grid .num{text-align:right;font-variant-numeric:tabular-nums}
+.workforce .data-grid .empty{padding:36px 12px;color:#98a2b3}
+.workforce .grid-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid #eef1f6}
+.workforce .grid-toolbar .grid-title{font-size:15px;margin-right:auto}
+.workforce .grid-toolbar input,.workforce .grid-toolbar select{height:36px;border:1px solid #d0d5dd;border-radius:8px;padding:0 10px;background:#fff;font-size:13px}
+.workforce .grid-toolbar .grid-search input{min-width:240px}
+
+/* totals bar under ordinary tables */
+.workforce .grid-foot,.svc .grid-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-top:1px solid #e4e7ec;background:#fcfcfd;color:#475467;font-size:13px}
+.workforce .grid-foot strong,.svc .grid-foot strong{color:#101828;font-size:14px}
+.workforce .grid-foot em,.svc .grid-foot em{font-style:normal;color:#667085;padding-left:10px;border-left:1px solid #e4e7ec}
+
+/* Two tables on one page (Stock + Ledger): share the fixed height */
+@media (min-width:901px){
+  .workforce .fit-split{display:flex;flex-direction:column;gap:12px;min-height:0}
+  .workforce .fit-split>.banner{flex:none;margin:0}
+  .workforce .fit-split>.data-grid{display:flex;flex-direction:column;min-height:150px}
+  .workforce .fit-split>.data-grid:first-of-type{flex:3 1 0}
+  .workforce .fit-split>.data-grid:last-of-type{flex:2 1 0}
+  .workforce .fit-split>.data-grid>.grid-toolbar,.workforce .fit-split>.data-grid>.grid-foot{flex:none}
+  .workforce .fit-split>.data-grid>.table-wrap{flex:1 1 0;min-height:0;max-height:none}
+}
+
+/* Item Master: keep the title and Save buttons in view while the form scrolls */
+@media (min-width:901px){
+  .workforce .im-head{position:sticky;top:0;z-index:6;background:#fff;padding-top:10px;margin-top:-10px;padding-bottom:10px;border-bottom:1px solid #eef1f6}
+}
+
+/* Pin / freeze columns (table-pins.js) */
+th .pin-btn{position:absolute;right:3px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:20px;height:20px;padding:0;border:0;border-radius:5px;background:#f8fafc;color:#98a2b3;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .15s ease,background .15s ease,color .15s ease;z-index:1}
+th .pin-btn svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transform:rotate(35deg)}
+th:hover .pin-btn,th .pin-btn:focus-visible{opacity:1;pointer-events:auto}
+th .pin-btn{box-shadow:-6px 0 6px #f8fafc}
+th .pin-btn.at-left{right:auto;left:3px;box-shadow:6px 0 6px #f8fafc}
+th .pin-btn:hover{background:#eef4ff;color:var(--accent)}
+th .pin-btn.on{opacity:1;pointer-events:auto;color:var(--accent);background:#eef4ff;box-shadow:none}
+th .pin-btn.on svg{fill:currentColor;transform:none}
+td.pin-cell{background-color:#fff;z-index:1}
+th.pin-cell{z-index:5 !important;background-color:#f8fafc}
+.pin-cell.pin-edge{box-shadow:inset -1px 0 0 #d9dee8,8px 0 10px -8px rgba(16,24,40,.22)}

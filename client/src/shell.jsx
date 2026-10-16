@@ -1,18 +1,25 @@
-import { useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { COPY, NAV, stateName } from '../../shared/domain.mjs';
 import { useAuth } from './auth.jsx';
+import { useTablePins } from './table-pins.js';
+import { ShortcutLayer, useAppTheme } from './shortcuts.jsx';
 
 const ICONS = {
   dashboard: 'M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z',
   inventory: 'M4 7h16v12H4zM4 7l8 5 8-5',
   product: 'M4 7h16v12H4zM4 7l8 5 8-5',
   stock: 'M3 8h18v11H3zM7 8V5h10v3M8 13h8',
+  transactions: 'M7 3h10v18l-2.5-1.6L12 21l-2.5-1.6L7 21zM9 8h6M9 12h6',
+  transfers: 'M4 7h13l-3-3M20 17H7l3 3',
   purchase: 'M6 6h15l-1.5 9h-12zM6 6 5 3H2M9 20h.01M17 20h.01',
   sales: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6',
   promotions: 'M20.5 13.3 13.3 20.5a2 2 0 0 1-2.8 0L3 13.1V3h10.1zM7.5 7.5h.01',
   reports: 'M4 19V5M4 19h16M8 15l3-4 3 2 4-6',
   configurations: 'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19.4 13a7.7 7.7 0 0 0 .1-2l2-1.2-2-3.4-2.3.6a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.5 2.9a7.6 7.6 0 0 0-1.7 1L6.5 6.4l-2 3.4L6.5 11a7.7 7.7 0 0 0 .1 2l-2 1.2 2 3.4 2.3-.6a7.6 7.6 0 0 0 1.7 1L11 21h4l.5-2.9a7.6 7.6 0 0 0 1.7-1l2.3.6 2-3.4z',
+  service: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z',
+  'service-board': 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z',
+  customers: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
   'branch-locations': 'M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11zM12 10.5h.01',
 };
 
@@ -50,7 +57,9 @@ function visibleChildren(children, session) {
 
 function isCurrent(href, location) {
   const url = new URL(href, 'http://stockkeep.local');
+  if (['/customers', '/service/jobs'].includes(url.pathname) && location.pathname.startsWith(`${url.pathname}/`)) return true;
   if (location.pathname !== url.pathname) return false;
+  if (['/customers', '/suppliers', '/menu/price-list'].includes(url.pathname)) return true;
   const have = new URLSearchParams(location.search);
   if ([...url.searchParams.keys()].length === 0) return [...have.keys()].length === 0;
   if ([...have.keys()].length === 0) {
@@ -63,6 +72,14 @@ function isCurrent(href, location) {
     if (have.get(key) !== value) return false;
   }
   return true;
+}
+
+// The sidebar group that holds the page being shown, if any.
+function groupOf(location) {
+  for (const item of NAV) {
+    if (item.children?.some((child) => !child.heading && isCurrent(child.href, location))) return item.id;
+  }
+  return null;
 }
 
 function Leaf({ item, nested, location, onNavigate }) {
@@ -86,12 +103,22 @@ function Leaf({ item, nested, location, onNavigate }) {
 }
 
 export function Shell() {
-  const { session, signOut } = useAuth();
-  const navigate = useNavigate();
+  const { session } = useAuth();
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const [menu, setMenu] = useState(false);
-  const [closed, setClosed] = useState([]);
+  // Accordion: all groups start collapsed; only one group is open at a time.
+  const [openGroup, setOpenGroup] = useState(() => groupOf(location));
+  useEffect(() => {
+    const current = groupOf(location);
+    if (current) setOpenGroup(current);
+  }, [location.pathname, location.search]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bodyRef = useRef(null);
+  useTablePins();
+  useAppTheme();
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+  }, [location.pathname]);
+
   if (!session) return null;
 
   const entries = [];
@@ -108,19 +135,17 @@ export function Shell() {
       if (item.pin) tabs.push(item);
     }
   }
-  const initials = session.user.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+  const query = new URLSearchParams(location.search);
+  const onDashboard = location.pathname === '/dashboard';
+  const composing = (location.pathname === '/catalogue' && (query.get('compose') === '1' || Boolean(query.get('edit'))))
+    || (['/customers', '/suppliers', '/menu/price-list'].includes(location.pathname) && (query.get('compose') === '1' || Boolean(query.get('edit'))));
 
   function closeMenu() {
     setOpen(false);
   }
 
   function toggleGroup(id) {
-    setClosed((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
-  }
-
-  async function logout() {
-    await signOut();
-    navigate('/login');
+    setOpenGroup((current) => (current === id ? null : id));
   }
 
   return (
@@ -141,7 +166,7 @@ export function Shell() {
             if (!entry.children) {
               return <Leaf key={entry.id} item={entry} location={location} onNavigate={closeMenu} />;
             }
-            const expanded = !closed.includes(entry.id);
+            const expanded = openGroup === entry.id;
             return (
               <div key={entry.id}>
                 <button type="button" className={expanded ? 'nav-parent open' : 'nav-parent'} aria-expanded={expanded} onClick={() => toggleGroup(entry.id)}>
@@ -150,11 +175,13 @@ export function Shell() {
                   <span className="nav-caret" />
                 </button>
                 <div className={expanded ? 'nav-children open' : 'nav-children'}>
-                  {entry.children.map((child) => (
-                    child.heading
-                      ? <div key={child.id} className="nav-note">{child.label}</div>
-                      : <Leaf key={child.id} item={child} nested location={location} onNavigate={closeMenu} />
-                  ))}
+                  <div className="nav-children-inner">
+                    {entry.children.map((child) => (
+                      child.heading
+                        ? <div key={child.id} className="nav-note">{child.label}</div>
+                        : <Leaf key={child.id} item={child} nested location={location} onNavigate={closeMenu} />
+                    ))}
+                  </div>
                 </div>
               </div>
             );
@@ -165,7 +192,7 @@ export function Shell() {
             <div className="hr-org-title">Business</div>
             <div className="hr-org-card">
               <strong>{session.tenant.name}</strong>
-              <small>{session.tenant.businessType === 'bike_service' ? 'Bike service centre' : 'Computer shop'} · {stateName(session.tenant.stateCode)}</small>
+              <small>{session.tenant.businessType === 'bike_service' ? 'Car & bike service centre' : 'Computer shop'} · {stateName(session.tenant.stateCode)}</small>
             </div>
           </div>
         </div>
@@ -173,32 +200,14 @@ export function Shell() {
       <div className="workspace">
         <div className="content">
           <button type="button" className="hr-menu" onClick={() => setOpen(true)}>Menu</button>
-          <div className="workforce">
-            <div className="wf-head">
-              <div>
-                <h1>{session.tenant.name}</h1>
-                <p>{session.tenant.plan.name}</p>
-              </div>
-              <div className="wf-tools">
-                <div className="wf-profile">
-                  <button type="button" className="wf-user" onClick={() => setMenu((value) => !value)}>
-                    <span className="wf-avatar">{initials}</span>
-                    {session.user.name}
-                  </button>
-                  {menu ? (
-                    <div className="wf-profile-menu">
-                      <strong>{session.user.role.name}</strong>
-                      <small>{session.user.email}</small>
-                      <button type="button" onClick={logout}>Sign out</button>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
+          <div className={composing ? 'workforce composing' : onDashboard ? 'workforce on-dashboard' : 'workforce'}>
+            <div className={onDashboard ? 'wf-body dash-body' : 'wf-body'} ref={bodyRef}>
+              <Outlet />
             </div>
-            <Outlet />
           </div>
         </div>
       </div>
+      <ShortcutLayer />
       <footer className="site-footer">
         <p>{COPY.footer}</p>
       </footer>
