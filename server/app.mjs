@@ -2,7 +2,7 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FEATURE_KEYS, LOCKED_FEATURES } from '../shared/domain.mjs';
+import { COMPANY_TYPES, FEATURE_KEYS, LOCKED_FEATURES, STATES, businessTypeOf } from '../shared/domain.mjs';
 import { hashPassword, hashToken, newRefreshToken, readAccess, signAccess, verifyPassword } from './auth.mjs';
 import { loadSession } from './session.mjs';
 import { provisionTenant } from './provision.mjs';
@@ -22,6 +22,7 @@ import { classify, cleanCode, lookupBarcode } from './barcode-lookup.mjs';
 import { checkBatches, cleanExpiry } from '../shared/expiry.mjs';
 import { isStockBarcode } from '../shared/stock-barcode.mjs';
 import { createLots } from './stock-lots.mjs';
+import { registerAdmin } from './admin.mjs';
 import { registerDataCleanup } from './data-cleanup.mjs';
 import { registerStockReport } from './stock-report.mjs';
 import { registerOrgStructure } from './org-structure.mjs';
@@ -195,8 +196,41 @@ function requireUser(store) {
     if (!session || session.tenant.id !== String(payload.tid)) return fail(res, 401, 'UNAUTHENTICATED', 'Sign in again.');
     req.session = session;
     req.companyId = session.tenant.id;
+    const blocked = featureBlock(req, session);
+    if (blocked) return fail(res, 403, 'FEATURE_DISABLED', `${blocked} is not included in your ${session.tenant.plan.name} package.`);
     next();
   });
+}
+
+// Admin Panel → screens switched off for the company's package: their APIs are closed too.
+// [path prefix, feature ids (any one on is enough), only for changes (not reads) when true, label]
+const FEATURE_GATES = [
+  ['/api/price-updates', ['price-updates'], true, 'Price Updates'],
+  ['/api/barcodes', ['print-barcodes'], false, 'Print Barcodes'],
+  ['/api/repack', ['repacking'], false, 'Repacking'],
+  ['/api/wastage', ['wastage'], false, 'Wastage Entry'],
+  ['/api/transfers', ['transfer-request', 'transfer-out', 'transfer-in', 'transfer-approvals'], true, 'Transfer Orders'],
+  ['/api/promotions/offers', ['offers'], true, 'Offer Management'],
+  ['/api/promotions/loyalty', ['loyalty'], true, 'Loyalty Program'],
+  ['/api/promotions/coupons', ['coupons'], true, 'Discount Coupons'],
+  ['/api/promotions/vouchers', ['vouchers'], true, 'Gift Vouchers'],
+  ['/api/warranty', ['warranty-desk'], true, 'Warranty & Guarantee'],
+  ['/api/uom', ['unit-conversion'], true, 'Unit Conversion'],
+  ['/api/price-lists', ['price-list'], true, 'Price list'],
+  ['/api/reports/stock-analysis', ['stock-analysis'], false, 'Stock Analysis'],
+  ['/api/migration', ['data-migration'], false, 'Data Migration'],
+  ['/api/data-cleanup', ['data-cleanup'], false, 'Data Cleanup'],
+];
+function featureBlock(req, session) {
+  const off = session.disabledFeatures || [];
+  if (!off.length) return '';
+  const path = req.originalUrl.split('?')[0];
+  for (const [prefix, ids, writesOnly, label] of FEATURE_GATES) {
+    if (path !== prefix && !path.startsWith(`${prefix}/`)) continue;
+    if (writesOnly && req.method === 'GET') return '';
+    return ids.every((id) => off.includes(id)) ? label : '';
+  }
+  return '';
 }
 
 function allow(permission, feature) {
@@ -304,16 +338,55 @@ export async function createApp(options = {}) {
     if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
       return fail(res, 400, 'INVALID', 'Use at least 8 characters, with a letter and a number.');
     }
+    // company type (searchable list on Start 15 Day's Trial); older callers may still send businessType only
+    if (body.companyType !== undefined && body.companyType !== '' && !COMPANY_TYPES.some(([id]) => id === body.companyType)) return fail(res, 400, 'INVALID', 'Choose the company type.');
+    if (body.companyType) body.businessType = businessTypeOf(body.companyType);
     if (!['computer_shop', 'bike_service'].includes(body.businessType)) {
-      return fail(res, 400, 'INVALID', 'Choose a computer shop or a bike service centre.');
+      return fail(res, 400, 'INVALID', 'Choose the company type.');
     }
+    const mobile = String(body.mobile || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
+    if (!/^[6-9]\d{9}$/.test(mobile)) return fail(res, 400, 'INVALID', 'Enter a valid 10-digit mobile number.');
+    body.mobile = mobile;
+    if (!STATES.some(([code]) => code === String(body.stateCode))) return fail(res, 400, 'INVALID', 'Choose the state.');
+    const a = body.address && typeof body.address === 'object' ? body.address : null;
+    if (a) {
+      const t = (v, n) => String(v || '').trim().slice(0, n);
+      body.address = { line1: t(a.line1, 120), line2: t(a.line2, 120), area: t(a.area, 80), city: t(a.city, 80), district: t(a.district, 80), state: t(a.state, 60), pincode: t(a.pincode, 6) };
+      if (body.address.pincode && !/^\d{6}$/.test(body.address.pincode)) return fail(res, 400, 'INVALID', 'Pincode must be 6 digits.');
+    } else body.address = null;
+    const g = body.geo && typeof body.geo === 'object' ? body.geo : null;
+    body.geo = g && Number.isFinite(Number(g.lat)) && Number.isFinite(Number(g.lng))
+      ? { status: 'captured', lat: Number(Number(g.lat).toFixed(6)), lng: Number(Number(g.lng).toFixed(6)), accuracy: Math.round(Number(g.accuracy) || 0), at: new Date().toISOString(), ip: req.ip || '' }
+      : { status: ['denied', 'unavailable', 'timeout'].includes(g?.status) ? g.status : 'not shared', at: new Date().toISOString(), ip: req.ip || '' };
     if (body.gstin && !String(body.gstin).toUpperCase().startsWith(body.stateCode)) {
       return fail(res, 400, 'INVALID', 'GSTIN must start with the state code.');
     }
     const existing = await store.find('users', { email });
     if (existing.length) return fail(res, 409, 'EMAIL_TAKEN', 'That email is already registered.');
-    const created = await provisionTenant(store, { ...body, email });
+    const created = await provisionTenant(store, { ...body, email, package: undefined, licenseMode: undefined });
     res.status(201).json(await issue(store, res, created.userId, created.companyId));
+  }));
+
+  // Start 15 Day's Trial → pincode fills area, city, district and state (India Post directory)
+  const pinCache = new Map();
+  app.get('/api/public/pincode/:pin', route(async (req, res) => {
+    const pin = String(req.params.pin || '');
+    if (!/^\d{6}$/.test(pin)) return fail(res, 400, 'INVALID', 'Pincode must be 6 digits.');
+    if (pinCache.has(pin)) return res.json(pinCache.get(pin));
+    let data;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 7000);
+      const reply = await fetch(`https://api.postalpincode.in/pincode/${pin}`, { signal: ctrl.signal });
+      clearTimeout(timer);
+      data = await reply.json();
+    } catch {
+      return fail(res, 502, 'LOOKUP_FAILED', 'Could not fetch the pincode details now. Type the address yourself.');
+    }
+    const offices = Array.isArray(data?.[0]?.PostOffice) ? data[0].PostOffice : [];
+    const out = { pincode: pin, areas: offices.map((o) => ({ area: o.Name || '', city: o.Block && o.Block !== 'NA' ? o.Block : o.Division || o.District || '', district: o.District || '', state: o.State || '', country: o.Country || 'India' })) };
+    if (out.areas.length) pinCache.set(pin, out);
+    res.json(out);
   }));
 
   app.post('/api/auth/login', route(async (req, res) => {
@@ -332,6 +405,9 @@ export async function createApp(options = {}) {
       return fail(res, 401, 'INVALID_LOGIN', 'Email or password is incorrect.');
     }
     loginHits.set(ip, { count: 0, at: Date.now() });
+    const [company] = await store.find('companies', { id: user.company_id });
+    if (company?.status === 'suspended') return fail(res, 403, 'COMPANY_DISABLED', 'This business account is disabled. Contact SKPOS support.');
+    if (user.status !== 'active') return fail(res, 403, 'USER_DISABLED', 'Your user account is not active. Ask the owner.');
     res.json(await issue(store, res, user.id, user.company_id));
   }));
 
@@ -2484,6 +2560,7 @@ export async function createApp(options = {}) {
     res.json(await loadSession(store, req.session.user.id));
   }));
 
+  registerAdmin(app, store, { route, fail, bearer });
   registerService(app, store, { auth, allow, route, fail, locationAllowed, scopedLocations });
   registerParties(app, store, { auth, allow, route, fail });
   registerPriceLists(app, store, { auth, allow, route, fail });

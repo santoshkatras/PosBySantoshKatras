@@ -1,4 +1,18 @@
 export const BUSINESS_TYPES = ['computer_shop', 'bike_service'];
+// Company type chosen at registration (Start 15 Day's Trial). Bike Service Center runs the workshop
+// (Vehicle Service) set-up; every other type runs the retail set-up.
+export const COMPANY_TYPES = [
+  ['departmental', 'Departmental Store'],
+  ['grocery', 'Grocery / Supermarket'],
+  ['apparel', 'Apparel / Readymade Garments'],
+  ['bike_service', 'Bike Service Center'],
+  ['book_shop', 'Book Shop'],
+  ['mobile_store', 'Mobile Store'],
+  ['electronics', 'Electronics Shop'],
+  ['other', 'Other'],
+];
+export const companyTypeLabel = (companyType, businessType) => COMPANY_TYPES.find(([id]) => id === companyType)?.[1] || (businessType === 'bike_service' ? 'Car & bike service centre' : 'Computer shop');
+export const businessTypeOf = (companyType) => (companyType === 'bike_service' ? 'bike_service' : 'computer_shop');
 export const FEATURE_KEYS = [
   'catalogue', 'stock', 'purchase', 'sales', 'customers', 'reports',
   'users', 'settings', 'notifications', 'serial', 'warranty', 'bike_service',
@@ -173,12 +187,24 @@ export function defaultRoleCodes(businessType) {
   if (businessType === 'bike_service') roles.push('service_advisor', 'mechanic');
   return roles;
 }
-export function defaultUnits(businessType) {
+export function defaultUnits(businessType, companyType) {
   const units = [{ code: 'pcs', name: 'Piece' }, { code: 'box', name: 'Box' }];
   if (businessType === 'bike_service') units.push({ code: 'ltr', name: 'Litre' }, { code: 'ml', name: 'Millilitre' });
+  if (['grocery', 'departmental'].includes(companyType)) units.push({ code: 'kg', name: 'Kilogram' }, { code: 'gm', name: 'Gram' }, { code: 'ltr', name: 'Litre' }, { code: 'ml', name: 'Millilitre' }, { code: 'pkt', name: 'Packet' });
+  if (companyType === 'apparel') units.push({ code: 'set', name: 'Set' }, { code: 'mtr', name: 'Metre' });
   return units;
 }
-export function defaultCategories(businessType) {
+const TYPE_CATEGORIES = {
+  departmental: [{ name: 'Grocery & Staples' }, { name: 'Home & Kitchen' }, { name: 'Personal Care' }, { name: 'Stationery' }, { name: 'Toys & Gifts' }],
+  grocery: [{ name: 'Staples', children: ['Rice & Grains', 'Pulses', 'Atta & Flour', 'Oil & Ghee'] }, { name: 'Beverages' }, { name: 'Snacks & Packaged Food' }, { name: 'Dairy' }, { name: 'Household' }, { name: 'Personal Care' }],
+  apparel: [{ name: 'Men', children: ['Shirts', 'T-Shirts', 'Trousers & Jeans'] }, { name: 'Women', children: ['Sarees', 'Kurtis', 'Tops'] }, { name: 'Kids' }, { name: 'Accessories' }],
+  book_shop: [{ name: 'Books', children: ['School Text Books', 'Competitive Exams', 'Novels'] }, { name: 'Stationery' }, { name: 'Office Supplies' }],
+  mobile_store: [{ name: 'Mobiles', children: ['Smartphones', 'Feature Phones'] }, { name: 'Accessories', children: ['Chargers & Cables', 'Covers & Glass', 'Earphones'] }, { name: 'Spare Parts' }],
+  electronics: [{ name: 'TV & Audio' }, { name: 'Home Appliances' }, { name: 'Kitchen Appliances' }, { name: 'Computers & Accessories' }],
+  other: [{ name: 'General' }],
+};
+export function defaultCategories(businessType, companyType) {
+  if (TYPE_CATEGORIES[companyType]) return TYPE_CATEGORIES[companyType];
   if (businessType === 'computer_shop') {
     return [{ name: 'Laptops', children: ['Gaming', 'Everyday'] }, { name: 'Components' }, { name: 'Accessories' }];
   }
@@ -207,8 +233,8 @@ export const COPY = {
   tag: 'INVENTORY',
   loginTitle: 'Sign in',
   loginCaption: 'Use the email and password for your shop or workshop.',
-  signupTitle: 'Create a business',
-  signupCaption: 'Pick computer shop or car & bike service. That choice turns the right modules on.',
+  signupTitle: "Start 15 Day's Trial",
+  signupCaption: 'Every feature of the Professional package, free for 15 days. No card needed.',
   demo: 'Demo businesses',
   demoHint: 'Every demo user uses the password Demo@12345.',
   computer: 'Demo login Other',

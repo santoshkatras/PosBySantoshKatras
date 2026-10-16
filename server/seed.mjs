@@ -79,6 +79,7 @@ export async function seedDemos(store) {
   const users = await store.find('users', {});
   if (!users.some((row) => row.email === 'owner@bytebazaar.demo')) {
     const shop = await provisionTenant(store, {
+      licenseMode: 'active', // demo businesses stay on Professional (no trial)
       ownerName: 'Asha Menon',
       email: 'owner@bytebazaar.demo',
       password: PASSWORD,
@@ -128,6 +129,7 @@ export async function seedDemos(store) {
   const again = await store.find('users', {});
   if (!again.some((row) => row.email === 'owner@spoke.demo')) {
     const shop = await provisionTenant(store, {
+      licenseMode: 'active', // demo businesses stay on Professional (no trial)
       ownerName: 'Ravi Shetty',
       email: 'owner@spoke.demo',
       password: PASSWORD,

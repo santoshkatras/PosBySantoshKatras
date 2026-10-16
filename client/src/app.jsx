@@ -19,6 +19,7 @@ import { JobListPage, ServiceBoardPage } from './service-board.jsx';
 import { JobCardPage, NewJobPage } from './service-job.jsx';
 import { CustomerHistoryPage, RemindersPage } from './customers.jsx';
 import { PartyPage } from './party-master.jsx';
+import { AdminPanelPage } from './admin-panel.jsx';
 
 function Boot() {
   return (
@@ -46,6 +47,7 @@ function Private() {
 export function App() {
   return (
     <Routes>
+      <Route path="/Adminpanel" element={<AdminPanelPage />} />
       <Route path="/login" element={<Guest><LoginPage /></Guest>} />
       <Route path="/signup" element={<Guest><SignupPage /></Guest>} />
       <Route path="/" element={<Private />}>

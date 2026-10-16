@@ -34,7 +34,32 @@ function Icon({ id }) {
 function allowed(item, session) {
   if (!item || item.heading) return false;
   if (item.feature && !session.modules.some((module) => module.key === item.feature && module.enabled)) return false;
+  if ((session.disabledFeatures || []).includes(item.id)) return false; // not in the company's package
   return session.user.permissions.includes(item.permission);
+}
+
+// the menu screen being shown, when the package switches it off
+function lockedScreen(location, session) {
+  const off = session.disabledFeatures || [];
+  if (!off.length) return null;
+  for (const item of NAV) {
+    for (const child of item.children || [item]) {
+      if (!child.heading && child.href && off.includes(child.id) && isCurrent(child.href, location)) return child;
+    }
+  }
+  return null;
+}
+
+// Trial / package badge for the sidebar: "Professional trial · 12 days left"
+function LicenceBadge({ session }) {
+  const lic = session.tenant.licence;
+  if (!lic) return null;
+  if (lic.expired) return <div className="lic-badge over" title="Contact SKPOS to choose a package">Trial ended · now on {lic.packageName}</div>;
+  if (lic.trial) {
+    const days = lic.daysLeft ?? 0;
+    return <div className={days <= 3 ? 'lic-badge low' : 'lic-badge'} title={lic.trialEndsAt ? `Trial ends ${new Date(lic.trialEndsAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : undefined}>{lic.packageName} trial · <b>{days}</b> day{days === 1 ? '' : 's'} left</div>;
+  }
+  return <div className="lic-badge paid">{lic.packageName} package</div>;
 }
 
 function visibleChildren(children, session) {
@@ -135,6 +160,7 @@ export function Shell() {
       if (item.pin) tabs.push(item);
     }
   }
+  const locked = lockedScreen(location, session);
   const query = new URLSearchParams(location.search);
   const onDashboard = location.pathname === '/dashboard';
   const composing = (location.pathname === '/catalogue' && (query.get('compose') === '1' || Boolean(query.get('edit'))))
@@ -192,7 +218,9 @@ export function Shell() {
             <div className="hr-org-title">Business</div>
             <div className="hr-org-card">
               <strong>{session.tenant.name}</strong>
-              <small>{session.tenant.businessType === 'bike_service' ? 'Car & bike service centre' : 'Computer shop'} · {stateName(session.tenant.stateCode)}</small>
+              <small>{session.tenant.companyTypeLabel || (session.tenant.businessType === 'bike_service' ? 'Car & bike service centre' : 'Computer shop')} · {stateName(session.tenant.stateCode)}</small>
+              {session.tenant.companyCode ? <small className="lic-id">Company ID {session.tenant.companyCode}</small> : null}
+              <LicenceBadge session={session} />
             </div>
           </div>
         </div>
@@ -202,7 +230,13 @@ export function Shell() {
           <button type="button" className="hr-menu" onClick={() => setOpen(true)}>Menu</button>
           <div className={composing ? 'workforce composing' : onDashboard ? 'workforce on-dashboard' : 'workforce'}>
             <div className={onDashboard ? 'wf-body dash-body' : 'wf-body'} ref={bodyRef}>
-              <Outlet />
+              {locked ? (
+                <div className="lic-locked">
+                  <h2>{locked.label}</h2>
+                  <p>This screen is not included in your <b>{session.tenant.plan.name}</b> package{session.tenant.licence?.expired ? ' — your 15-day trial has ended' : ''}.</p>
+                  <p>Contact SKPOS to upgrade your package: Santosh Katras, Mob. 9975658762.</p>
+                </div>
+              ) : <Outlet />}
             </div>
           </div>
         </div>

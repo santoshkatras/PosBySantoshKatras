@@ -9,6 +9,7 @@ import './menu-search.css';
 function allowed(item, session) {
   if (!item || item.heading) return false;
   if (item.feature && !session.modules.some((module) => module.key === item.feature && module.enabled)) return false;
+  if ((session.disabledFeatures || []).includes(item.id)) return false;
   return session.user.permissions.includes(item.permission);
 }
 

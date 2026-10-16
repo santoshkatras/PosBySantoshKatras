@@ -45,3 +45,23 @@ export function readAccess(token) {
 export function newRefreshToken() {
   return randomBytes(32).toString('base64url');
 }
+
+// Admin Panel sign-in (platform owner, not a shop user): own token kind, 12 hours.
+export function signAdmin(adminId) {
+  const body = Buffer.from(JSON.stringify({ adm: adminId, exp: Date.now() + 12 * 60 * 60 * 1000 })).toString('base64url');
+  const sig = createHmac('sha256', `${SECRET}:admin`).update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+
+export function readAdmin(token) {
+  if (!token || !token.includes('.')) return null;
+  const [body, sig] = token.split('.');
+  const expected = createHmac('sha256', `${SECRET}:admin`).update(body).digest('base64url');
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  let payload;
+  try { payload = JSON.parse(Buffer.from(body, 'base64url').toString()); } catch { return null; }
+  if (!payload?.adm || payload.exp < Date.now()) return null;
+  return payload;
+}

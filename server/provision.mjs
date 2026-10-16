@@ -9,10 +9,23 @@ import {
   trialPlanCode,
 } from '../shared/domain.mjs';
 import { hashPassword } from './auth.mjs';
+import { TRIAL_DAYS, TRIAL_PACKAGE, defaultOnModules } from '../shared/licensing.mjs';
 import { newId, slugify } from './ids.mjs';
 
 export function planByCode(code) {
   return PLANS.find((plan) => plan.code === code) || null;
+}
+
+// 14-digit company ID: registration date (YYYYMMDD) + 6 digits, never repeated
+export async function newCompanyCode(store, at = new Date()) {
+  const used = new Set((await store.find('companies', {})).map((c) => String(c.company_code || '')));
+  const d = new Date(at);
+  const day = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  for (let i = 0; i < 200; i += 1) {
+    const code = `${day}${String(Math.floor(Math.random() * 1000000)).padStart(6, '0')}`;
+    if (!used.has(code)) return code;
+  }
+  throw new Error('COMPANY_CODE');
 }
 
 export async function provisionTenant(store, input) {
@@ -26,25 +39,33 @@ export async function provisionTenant(store, input) {
     legal_name: input.legalName ?? input.businessName,
     slug: slugify(input.businessName),
     plan: plan.code,
+    // every new business starts on the Professional package as a 15-day trial
+    package: input.package || TRIAL_PACKAGE,
+    license_mode: input.licenseMode || 'trial',
     status: 'trial',
     max_users: plan.limits.users,
-    expires_at: new Date(now.getTime() + plan.trialDays * 86400000).toISOString(),
+    expires_at: new Date(now.getTime() + TRIAL_DAYS * 86400000).toISOString(),
     created_at: now.toISOString(),
-    company_code: companyId,
+    company_code: await newCompanyCode(store, now),
     business_type: input.businessType,
+    company_type: input.companyType || '',
     gstin: input.gstin || '',
     state_code: input.stateCode,
+    phone: input.mobile || '',
+    email: input.email || '',
+    address: input.address ? JSON.stringify(input.address) : '',
+    geo: input.geo ? JSON.stringify(input.geo) : '',
   });
   for (const key of FEATURE_KEYS) {
     await store.insert('settings', {
       company_id: company.id,
       setting_key: key,
-      setting_value: plan.modules[key] ? '1' : '0',
+      setting_value: defaultOnModules(input.businessType, input.companyType).includes(key) ? '1' : '0',
     });
   }
   const location = await store.insert('locations', {
     company_id: company.id,
-    name: input.locationName || 'Main counter',
+    name: input.locationName || 'Main Location',
     kind: input.businessType === 'bike_service' ? 'service_bay' : 'store',
     is_active: 1,
   });
@@ -61,11 +82,11 @@ export async function provisionTenant(store, input) {
     }
   }
   const unitIds = {};
-  for (const unit of defaultUnits(input.businessType)) {
+  for (const unit of defaultUnits(input.businessType, input.companyType)) {
     const saved = await store.insert('units', { company_id: company.id, code: unit.code, name: unit.name });
     unitIds[unit.code] = saved.id;
   }
-  for (const category of defaultCategories(input.businessType)) {
+  for (const category of defaultCategories(input.businessType, input.companyType)) {
     const parent = await store.insert('categories', { company_id: company.id, name: category.name });
     for (const child of category.children ?? []) {
       await store.insert('categories', { company_id: company.id, name: child, parent_id: parent.id });
@@ -76,6 +97,7 @@ export async function provisionTenant(store, input) {
     role_id: roleIds.owner,
     name: input.ownerName,
     email: input.email.toLowerCase(),
+    mobile: input.mobile || '',
     password_hash: hashPassword(input.password),
     status: 'active',
     created_at: now.toISOString(),

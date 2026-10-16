@@ -221,3 +221,14 @@
 @media (prefers-reduced-motion:reduce){.shell .sidebar .nav-children,.shell .sidebar a.nav-sub,.shell .sidebar .nav-caret{transition:none}}.choice-row.demo-row{flex-wrap:nowrap}.choice-row.demo-row .choice{flex:1;white-space:nowrap;min-width:0;padding-left:10px;padding-right:10px}
 @media (max-width:1080px){.shell.hrpay .workspace{grid-column:1}}
 .fixed-tag{font-style:normal;margin-left:8px;background:#fff4e5;color:#b54708;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700}
+
+/* package / trial badge (sidebar business card) and screens outside the package */
+.lic-badge{margin-top:8px;display:inline-block;border-radius:999px;padding:3px 10px;font-size:11.5px;font-weight:600;background:rgba(47,107,255,.18);color:#cfe0ff}
+.lic-badge b{color:#fff}
+.lic-badge.low{background:rgba(245,158,11,.22);color:#fde68a}
+.lic-badge.over{background:rgba(239,68,68,.22);color:#fecaca}
+.lic-badge.paid{background:rgba(16,185,129,.18);color:#a7f3d0}
+.lic-locked{max-width:620px;margin:40px auto;padding:28px 30px;border:1px solid #e4e7ec;border-radius:16px;background:#fff;text-align:center;box-shadow:0 1px 3px #1018281a}
+.lic-locked h2{margin:0 0 10px;font-size:20px}
+.lic-locked p{margin:6px 0;color:#475467;font-size:14px}
+.lic-id{display:block;margin-top:2px;font-family:ui-monospace,monospace;font-size:11px;opacity:.75}

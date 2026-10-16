@@ -25,6 +25,7 @@ async function signup(base, label, businessType) {
       businessType,
       stateCode: '27',
       locationName: 'Main counter',
+      mobile: '9876543210',
     }),
   });
   const body = await response.json();
