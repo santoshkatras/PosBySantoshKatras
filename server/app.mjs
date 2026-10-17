@@ -2641,6 +2641,13 @@ export async function createApp(options = {}) {
 
   if (options.vite === false) return { app, store };
 
+  // public Features & Help page (no sign-in): /features and /features/
+  app.get(/^\/features\/?$/, (_req, res) => {
+    const built = join(distDir, 'features', 'index.html');
+    res.sendFile(existsSync(built) ? built : join(clientRoot, 'public', 'features', 'index.html'));
+  });
+  app.use('/features/img', express.static(existsSync(join(distDir, 'features', 'img')) ? join(distDir, 'features', 'img') : join(clientRoot, 'public', 'features', 'img'), { maxAge: '7d' }));
+
   if (process.env.NODE_ENV === 'production' && existsSync(distDir)) {
     app.use(express.static(distDir));
     app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(join(distDir, 'index.html')));

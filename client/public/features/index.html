@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SKPOS Features &amp; Help</title>
+<meta name="description" content="SKPOS help guide: features for every business type — grocery, departmental store, apparel, mobile & electronics, book shop, liquor / wine shop & bar and bike / car service centres — with screenshots and use cases.">
+<style>
+:root{--ink:#0f172a;--muted:#5b6476;--line:#e4e7ee;--bg:#f6f7fb;--card:#fff;--brand:#4f46e5;--brand-50:#eef0ff;--accent:#0f766e;--warn:#b45309;--radius:14px}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:76px}
+body{margin:0;font:15px/1.6 Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+a{color:var(--brand);text-decoration:none}
+a:hover{text-decoration:underline}
+header.top{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1320px;margin:0 auto;display:flex;align-items:center;gap:16px;padding:12px 20px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--ink);font-size:18px}
+.logo b{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--brand);color:#fff;font-size:13px}
+.logo small{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em}
+.search{flex:1;max-width:460px;margin-left:auto}
+.search input{width:100%;height:38px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font:inherit;background:#fff}
+.top a.btn{display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:10px;font-weight:600;white-space:nowrap}
+.btn.ghost{border:1px solid var(--line);color:var(--ink);background:#fff}
+.btn.solid{background:var(--brand);color:#fff}
+.btn.solid:hover,.btn.ghost:hover{text-decoration:none;filter:brightness(.97)}
+.wrap{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:28px;padding:24px 20px 60px}
+nav.side{position:sticky;top:78px;align-self:start;max-height:calc(100vh - 96px);overflow:auto}
+nav.side h4{margin:16px 0 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+nav.side a{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:9px;color:var(--ink);font-weight:500;font-size:14px}
+nav.side a:hover{background:#fff;text-decoration:none}
+nav.side a.on{background:var(--brand-50);color:var(--brand);font-weight:700}
+.dot{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff;flex:none}
+.hero{background:linear-gradient(135deg,#eef0ff,#f0fdfa);border:1px solid var(--line);border-radius:18px;padding:28px 30px;margin-bottom:26px}
+.hero h1{margin:0 0 8px;font-size:30px;line-height:1.2}
+.hero p{margin:0;color:var(--muted);max-width:760px}
+.types{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:10px;margin-top:18px}
+.types a{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--ink);font-weight:600;font-size:14px}
+.types a:hover{border-color:var(--brand);text-decoration:none}
+section.biz{margin:0 0 40px}
+.biz-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:6px}
+.biz-head .dot{width:42px;height:42px;border-radius:12px;font-size:18px}
+.biz-head h2{margin:2px 0 2px;font-size:24px}
+.biz-head p{margin:0;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 16px}
+.chips span{font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:999px;background:#fff;border:1px solid var(--line);color:#334155}
+.chips span.key{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(400px,100%),1fr));gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column}
+.card figure{margin:0;aspect-ratio:16/9;background:#eef1f6;border-bottom:1px solid var(--line);cursor:zoom-in;overflow:hidden}
+.card figure img{width:100%;height:100%;object-fit:cover;object-position:top left;display:block;transition:transform .3s}
+.card figure:hover img{transform:scale(1.03)}
+.card .body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:8px;flex:1}
+.card h3{margin:0;font-size:17px}
+.where{font-size:12.5px;color:var(--muted)}
+.where b{color:#334155}
+.card p{margin:0;color:#334155}
+.card ul{margin:0;padding-left:18px;color:#334155}
+.card li{margin:2px 0}
+.use{margin-top:auto;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;font-size:14px}
+.use b{color:var(--warn)}
+.card.text figure{display:none}
+.tip{background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:12px 16px;margin:0 0 18px;color:#334155}
+table.pk{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px}
+table.pk th,table.pk td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left}
+table.pk th{background:#f8fafc;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+table.pk td.c{text-align:center}
+.keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.keys div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px}
+kbd{display:inline-block;border:1px solid #cbd5e1;border-bottom-width:2px;border-radius:5px;padding:0 6px;font:600 12px ui-monospace,Consolas,monospace;background:#fff;margin:0 2px}
+details{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:8px}
+details summary{cursor:pointer;font-weight:600}
+details p{margin:8px 0 0;color:#334155}
+.empty{display:none;padding:30px;text-align:center;color:var(--muted)}
+footer{border-top:1px solid var(--line);padding:22px;text-align:center;color:var(--muted);font-size:13px;background:#fff}
+.lb{position:fixed;inset:0;z-index:50;background:rgba(15,23,42,.86);display:none;align-items:center;justify-content:center;padding:24px;cursor:zoom-out}
+.lb.on{display:flex}
+.lb img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.lb p{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#e2e8f0;margin:0;font-weight:600}
+.hide{display:none!important}
+@media (max-width:640px){html{scroll-padding-top:128px}.top-in{flex-wrap:wrap;gap:10px;padding:10px 14px}.search{order:3;flex-basis:100%;max-width:none}.logo small{display:none}.wrap{padding:16px 14px 40px}.hero{padding:20px}.types{grid-template-columns:1fr 1fr}.card .body{padding:14px}table.pk{display:block;overflow-x:auto}}
+body{overflow-x:hidden}
+main{min-width:0}
+.card{min-width:0}
+.card figure img{max-width:100%}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr)}nav.side{position:static;max-height:none;display:flex;flex-wrap:wrap;gap:4px}nav.side h4{width:100%}.grid{grid-template-columns:1fr}.top a.ghost{display:none}.hero h1{font-size:24px}}
+@media print{header.top,nav.side,.search,.lb{display:none!important}.wrap{display:block}.card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <a class="logo" href="/features/"><b>SK</b><span>SKPOS<small>FEATURES &amp; HELP</small></span></a>
+  <div class="search"><input id="q" type="search" placeholder="Search features — e.g. IMEI, expiry, advance, excise, job card" aria-label="Search features"></div>
+  <a class="btn ghost" href="/login">Sign in</a>
+  <a class="btn solid" href="/signup">Start 15-day trial</a>
+</div></header>
+
+<div class="wrap">
+<nav class="side" id="side">
+  <h4>Start here</h4>
+  <a href="#start"><span class="dot" style="background:#4f46e5">▶</span>Getting started</a>
+  <a href="#core"><span class="dot" style="background:#0f172a">★</span>All businesses</a>
+  <h4>Business types</h4>
+  <a href="#grocery"><span class="dot" style="background:#3f7d4f">G</span>Grocery &amp; Supermarket</a>
+  <a href="#departmental"><span class="dot" style="background:#3b5b8c">D</span>Departmental Store</a>
+  <a href="#apparel"><span class="dot" style="background:#7a4a7d">A</span>Apparel &amp; Garments</a>
+  <a href="#mobile"><span class="dot" style="background:#165a63">M</span>Mobile &amp; Electronics</a>
+  <a href="#books"><span class="dot" style="background:#a8862b">B</span>Book Shop &amp; Stationery</a>
+  <a href="#liquor"><span class="dot" style="background:#8a2b3d">L</span>Liquor / Wine Shop &amp; Bar</a>
+  <a href="#service"><span class="dot" style="background:#c2703d">S</span>Bike &amp; Car Service</a>
+  <h4>More</h4>
+  <a href="#packages"><span class="dot" style="background:#0f766e">₹</span>Packages</a>
+  <a href="#keys"><span class="dot" style="background:#475569">⌨</span>Keyboard</a>
+  <a href="#faq"><span class="dot" style="background:#64748b">?</span>FAQ</a>
+</nav>
+
+<main id="main">
+  <div class="hero">
+    <h1>SKPOS — billing, stock &amp; accounts for every kind of shop</h1>
+    <p>This guide shows what SKPOS does for each business type, with real screenshots, what each screen is for and a typical use case. Pick your business below — features marked <b>Key</b> are the ones that matter most for that type.</p>
+    <div class="types">
+      <a href="#grocery"><span class="dot" style="background:#3f7d4f">G</span>Grocery / Supermarket</a>
+      <a href="#departmental"><span class="dot" style="background:#3b5b8c">D</span>Departmental Store</a>
+      <a href="#apparel"><span class="dot" style="background:#7a4a7d">A</span>Apparel / Garments</a>
+      <a href="#mobile"><span class="dot" style="background:#165a63">M</span>Mobile Store</a>
+      <a href="#mobile"><span class="dot" style="background:#2a8a8f">E</span>Electronics Shop</a>
+      <a href="#books"><span class="dot" style="background:#a8862b">B</span>Book Shop</a>
+      <a href="#liquor"><span class="dot" style="background:#8a2b3d">L</span>Liquor / Wine &amp; Bar</a>
+      <a href="#service"><span class="dot" style="background:#c2703d">S</span>Bike Service Center</a>
+    </div>
+  </div>
+  <div id="sections"></div>
+  <div class="empty" id="empty">No feature matches your search.</div>
+
+  <section class="biz" id="packages">
+    <div class="biz-head"><span class="dot" style="background:#0f766e">₹</span><div><h2>Packages</h2><p>Every new registration gets the Professional package free for 15 days. Limits below are the standard ones; your plan may differ.</p></div></div>
+    <table class="pk">
+      <thead><tr><th>What you get</th><th>Free Tier</th><th>Starter</th><th>Standard</th><th>Professional</th></tr></thead>
+      <tbody>
+        <tr><td>Locations / branches</td><td class="c">1</td><td class="c">1</td><td class="c">3</td><td class="c">10</td></tr>
+        <tr><td>Users</td><td class="c">1</td><td class="c">3</td><td class="c">8</td><td class="c">25</td></tr>
+        <tr><td>Billing, items, stock, customers</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td></tr>
+        <tr><td>Purchase (PO, GRN, invoice), suppliers</td><td class="c">—</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td></tr>
+        <tr><td>Serial / IMEI, Vehicle Service</td><td class="c">—</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td></tr>
+        <tr><td>Reports, Warranty, Liquor Shop module</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td class="c">✓</td></tr>
+        <tr><td>Branch transfers, offers &amp; coupons</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td class="c">✓</td></tr>
+        <tr><td>Loyalty, gift vouchers, organisation structure</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="biz" id="keys">
+    <div class="biz-head"><span class="dot" style="background:#475569">⌨</span><div><h2>Work fast with the keyboard</h2><p>SKPOS works like desktop billing software — you rarely need the mouse.</p></div></div>
+    <div class="keys">
+      <div><kbd>Enter</kbd> next field in any form · <kbd>Shift</kbd>+<kbd>Enter</kbd> back</div>
+      <div><kbd>Space</kbd> tick / untick a stock barcode, batch, serial or item in a pick list</div>
+      <div><kbd>↑</kbd> <kbd>↓</kbd> move between rows and pick lists</div>
+      <div><kbd>F10</kbd> save · <kbd>Shift</kbd>+<kbd>F10</kbd> Cash Save · <kbd>F8</kbd> payment</div>
+      <div><kbd>Esc</kbd> close a window (asks before losing work)</div>
+      <div><kbd>Ctrl</kbd>+<kbd>K</kbd> search any menu · <kbd>Ctrl</kbd>+<kbd>/</kbd> list of keys</div>
+      <div><kbd>F5</kbd> refresh a report</div>
+      <div>Every key can be changed in <b>Configurations › Shortcut Key Configurations</b></div>
+    </div>
+  </section>
+
+  <section class="biz" id="faq">
+    <div class="biz-head"><span class="dot" style="background:#64748b">?</span><div><h2>Frequently asked questions</h2></div></div>
+    <details><summary>Which features do I get for my business type?</summary><p>When you register you choose a company type. SKPOS switches on the modules that type needs (for example Serial / IMEI and Warranty for a Mobile Store, the Liquor Shop module for a wine shop, Vehicle Service for a service centre). Anything else included in your package can be switched on in Configurations.</p></details>
+    <details><summary>Can I use one login for several branches?</summary><p>Yes. Add branches and warehouses in Configurations › Branch &amp; Locations. Stock is kept per location, users can be limited to their own locations, and Transfer Orders move stock between them with approvals.</p></details>
+    <details><summary>Does SKPOS work on a phone or tablet?</summary><p>Yes, it runs in any modern browser — Chrome, Edge, Safari or Firefox — on a PC, laptop, tablet or phone. A barcode scanner that types like a keyboard works on every billing screen.</p></details>
+    <details><summary>Is GST handled?</summary><p>Yes. Items carry HSN / SAC and GST rate; bills split CGST + SGST or IGST automatically from the customer's state, and the Sales and Purchase reports include rate-wise GST and HSN summaries for GSTR-1 and GSTR-3B.</p></details>
+    <details><summary>How do I give credit and collect later?</summary><p>Choose a saved customer and pay with “Credit (On Account)”. The amount shows in Sales › Outstanding Collection &amp; Refunds, where you collect against the bills, keep advances, adjust them to new bills or refund them.</p></details>
+    <details><summary>Where is my data kept?</summary><p>Your data is stored in a secure cloud database, separate for every company. Owners can export any report to CSV at any time.</p></details>
+  </section>
+</main>
+</div>
+
+<footer>SKPOS · Designed and Developed by Santosh Katras, Vambori · <a href="/signup">Start your 15-day trial</a> · <a href="/login">Sign in</a></footer>
+<div class="lb" id="lb" role="dialog" aria-label="Screenshot"><img alt=""><p></p></div>
+
+<script>
+// Features by business type. shot: screenshot in /features/img · where: menu path · use: a typical use case
+const BIZ = [
+  { id: 'start', name: 'Getting started', color: '#4f46e5', letter: '▶', intro: 'Create your shop in three short steps and start billing in minutes.', chips: [],
+    items: [
+      { t: 'Register your business', shot: 'signup', where: 'pos.santoshkatras.com › Start 15-day trial', d: 'Choose your company type, then enter the owner login and your address. SKPOS sets up your first location, users, GST state and the modules your business type needs.', list: ['15 days free on the Professional package — no card needed', 'Company type decides the modules switched on (IMEI, liquor, workshop …)', 'Pincode fills city, district and state'], use: 'A new grocery store owner registers at night and starts billing at the counter the next morning.' },
+      { t: 'Dashboard', shot: 'dashboard', where: 'Dashboard', d: 'Today’s and this month’s sales, purchase, stock value, low-stock and expiry alerts, pending transfers and business share by category, location and brand — for one branch or all.', use: 'The owner checks sales of every branch from the phone before going to the shop.' },
+      { t: 'Add your items', shot: 'items', where: 'Inventory › Product', d: 'Item master with item code, barcode, HSN, GST, MRP, selling and cost price, brand and category. Item types: Standard, Batch & Expiry, Serial / IMEI, Matrix (size / colour) and Service.', list: ['Import from Excel with Data Migration', 'Several barcodes / EANs per item', 'Opening stock while creating the item'], use: 'Import 2,000 items from the old software’s Excel export in one go.' },
+    ] },
+  { id: 'core', name: 'Every business', color: '#0f172a', letter: '★', intro: 'These features are part of SKPOS for every business type.', chips: ['Billing', 'GST', 'Purchase', 'Stock', 'Accounts', 'Reports', 'Promotions', 'Multi-branch'],
+    items: [
+      { t: 'Fast Sales Bill', shot: 'sales-bill', where: 'Sales › Sales Bill', d: 'Scan or type the item code, enter the quantity, press Enter — the line is added with GST worked out. Hold a bill for the next customer, recall it later, load a Sales Order, apply offers and coupons automatically.', list: ['Cash Save (Shift+F10) saves a cash bill in one key', 'Customer history link shows past bills and dues', 'Stock barcode scanning takes stock from that exact lot', 'Maximise / focus mode for a bigger item table'], use: 'Saturday rush: the cashier scans 15 items, presses Cash Save and the bill prints — under 30 seconds.' },
+      { t: 'Split payments & tenders', shot: 'payment', where: 'Sales Bill › Payment (F8)', d: 'Take cash, card, UPI, bank transfer, cheque, credit (on account), gift voucher and loyalty points in one bill. Change to return is shown; coupon codes are checked here.', use: '₹2,216 bill paid ₹1,000 by UPI and the rest in cash.' },
+      { t: 'Sales Returns & Exchange', shot: 'sales-return', where: 'Sales › Sales Returns', d: 'Load the original bill, enter what comes back — the same stock barcodes and serial numbers return to stock. Settle as cash refund, exchange credit for a new bill, or credit to the customer’s account.', use: 'A customer returns 2 shirts of 5; the value is used on a new bill as exchange credit.' },
+      { t: 'Outstanding Collection & Refunds', shot: 'collect-popup', where: 'Sales › Outstanding Collection & Refunds', d: 'See what every customer owes, overdue amounts and advances. Collect against chosen bills (tick with Space) or oldest first, keep money as advance, adjust an advance to a bill, or refund extra paid.', list: ['Ledger with every collection, refund and credit note', 'Entries register with CSV export', 'Aging report 0–30 / 31–60 / 61–90 / 90+ days'], use: 'A contractor pays ₹15,000 against three credit bills; SKPOS clears the oldest first and keeps ₹500 as advance.' },
+      { t: 'Purchase: PO → Receipt Note → Invoice', shot: 'purchase-invoices', where: 'Purchase', d: 'Raise Purchase Orders, receive goods with a Receipt Note (batches, serials, stock barcodes) and convert to the Purchase Invoice without double stock. Landing cost formulas set the selling price automatically.', list: ['“Paid now” on the invoice records the payment', 'Partly received POs stay pending', 'Supplier invoice number and due date'], use: 'Order 100 units, receive 80 this week and 20 next week against the same PO.' },
+      { t: 'Supplier Payments & Refunds', shot: 'supplier-payments', where: 'Purchase › Supplier Payments & Refunds', d: 'Pay suppliers against invoices or in advance, adjust advances to invoices and record refunds the supplier gives back. Payable aging shows what is due.', use: 'Pay a distributor ₹50,000 by NEFT against four invoices with the UTR number.' },
+      { t: 'Stock entries & item ledger', shot: 'item-ledger', where: 'Transactions · Inventory › Item Ledger', d: 'Opening stock, stock updates, damage / found entries and a full ledger of every movement with reason and reference.', use: 'Find out who removed 2 pieces of an item last week and why.' },
+      { t: 'Branch transfers', shot: 'transfer-out', where: 'Transfer Orders', d: 'Request stock from another branch or warehouse, send it with Transfer Out and receive with Transfer In. Approvals, partly received transfers and in-transit stock are tracked.', use: 'The warehouse sends 40 cartons to the city store; the store confirms 38 received and 2 damaged.' },
+      { t: 'Wastage entry', shot: 'wastage', where: 'Transactions › Wastage Entry', d: 'Write off damaged, expired or defective stock with reasons, approvals for abnormal loss and value at cost.', use: 'Expired biscuit packets are written off at month end with one entry.' },
+      { t: 'Offers, coupons, loyalty & gift vouchers', shot: 'offers', where: 'Promotions', d: 'Buy X get Y, percentage or flat off, combo price, happy hours and bill-value offers apply automatically on the bill. Discount coupons, loyalty points with tiers and gift vouchers too.', use: '“Buy 2 get 1 free” on soaps for the festival week — no manual discount needed.' },
+      { t: 'Loyalty program', shot: 'loyalty', where: 'Promotions › Loyalty Program', d: 'Points on every bill, tiers (Silver, Gold, Platinum), birthday bonus, minimum bill and expiry. Customers pay with points at the counter.', use: 'Regular customers earn 1 point per ₹100 and redeem them on their next visit.' },
+      { t: '56 module-wise reports', shot: 'reports-sales', where: 'Reports › Masters / Sales / Purchase / Stock / Promotions', d: 'Bill register, item / customer / category / brand-wise sales, day / month / hour-wise, payment modes, GST and HSN summaries, profit, returns, aging, stock summary, valuation, low stock, expiry, dead stock and more.', list: ['Period, location and customer / supplier filters', 'Search, sort, totals row', 'Export CSV and print'], use: 'At GST filing time, export the HSN summary and rate-wise GST for the month.' },
+      { t: 'Stock summary & analysis', shot: 'reports-stock', where: 'Reports › Stock Transactions · Stock Analysis', d: 'Opening → in → out → closing for any period, current stock per location, valuation, low stock and a pivot analysis by any category.', use: 'See which items did not sell in 90 days and run a clearance offer.' },
+      { t: 'Sales Configurations', shot: 'sales-config', where: 'Configurations › Sales Configurations', d: 'Set the rules of your counter: customer mandatory or walk-in allowed, maximum discount, bill-wise discount, lock selling rates, Sales Order advance (optional, ask, mandatory), print after save and where the cursor starts.', use: 'Stop cashiers from giving more than 5% discount and make the customer mandatory for credit counters.' },
+      { t: 'Counters, users & rights', shot: 'org-structure', where: 'Configurations › Organisation Structure · Users', d: 'Branches, counters with their own bill series, user groups and screen-wise rights. Each user sees only the locations given to them.', use: 'Counter 1 bills SB-C1-0001…, counter 2 SB-C2-0001…; the cashier cannot see purchase rates.' },
+      { t: 'Barcode labels', shot: 'print-barcodes', where: 'Inventory › Print Barcodes', d: 'Print item or stock barcode labels on any roll or A4 sheet with MRP, price, batch and expiry — straight from a receipt note, opening stock or price update.', use: 'Print labels for all 120 pieces received on today’s receipt note.' },
+      { t: 'Customer master', shot: 'customers', where: 'Sales › Customers', d: 'Customers with GSTIN check, pincode-based address, credit days and limit, and a full history of bills, returns, dues and loyalty.', use: 'Look up a regular customer by mobile number and see everything they bought this year.' },
+    ] },
+  { id: 'grocery', name: 'Grocery & Supermarket', color: '#3f7d4f', letter: 'G', intro: 'Fast counter billing for many small items, batches with expiry, loose items sold by weight and offers that bring customers back.', chips: ['key:Batch & expiry', 'key:Unit conversion', 'key:Repacking', 'key:Offers', 'Loyalty', 'Wastage', 'Price list'],
+    items: [
+      { t: 'Batch & expiry (FEFO)', shot: 'batch-expiry-pick', where: 'Sales Bill › item window', d: 'Items with batch, manufacturing and expiry dates. Billing picks the earliest expiry first automatically; the window shows every batch with days left, and you can tick a batch with Space.', list: ['Expiry alerts on the dashboard', 'Batch & expiry report with days left', 'Expired stock is highlighted'], use: 'Milk powder from two batches — the batch expiring in August goes out before the one expiring in December.' },
+      { t: 'Quick billing at the counter', shot: 'sales-bill-qty', where: 'Sales › Sales Bill', d: 'Scan, type the quantity, Enter. Rates include GST or not as you choose; Cash Save finishes the bill with one key.', use: 'A queue of 10 customers with 20 items each is billed by one cashier without the mouse.' },
+      { t: 'Unit conversion & repacking', text: true, where: 'Inventory › Unit Conversion · Repacking', d: 'Buy in bags or cartons, sell in kg, packets or pieces. Repacking turns 50 kg of loose sugar into 1 kg and 500 g packets with their own barcodes and cost.', use: 'A 25 kg rice bag is repacked into 25 × 1 kg packets with printed labels.' },
+      { t: 'Price lists & scheduled price updates', text: true, where: 'Inventory › Price list · Price Updates', d: 'Different prices for wholesale and retail customers, and price changes that start on a date.', use: 'Wholesale customers automatically get the wholesale rate on the bill.' },
+      { t: 'Offers & loyalty', shot: 'offers', where: 'Promotions', d: 'Buy X get Y, combo, bill-value and happy-hour offers, coupons and loyalty points — all applied on the bill.', use: '“Spend ₹1,000 and get 1 kg sugar free” for the weekend.' },
+      { t: 'Wastage & expiry write-off', shot: 'wastage', where: 'Transactions › Wastage Entry', d: 'Write off expired or damaged stock with reasons; the loss shows in reports.', use: 'Broken eggs and expired bread are written off daily.' },
+    ] },
+  { id: 'departmental', name: 'Departmental Store', color: '#3b5b8c', letter: 'D', intro: 'Many departments, many counters and often more than one branch.', chips: ['key:Counters', 'key:Branch transfers', 'key:Category-wise reports', 'Offers', 'Gift vouchers', 'Users & rights'],
+    items: [
+      { t: 'Counters & bill series', shot: 'org-structure', where: 'Configurations › Organisation Structure', d: 'Every counter has its own bill numbering; cashiers bill only from their counters and locations.', use: 'Five counters running at the same time, each with its own series and cash report.' },
+      { t: 'Branches & warehouse transfers', shot: 'transfer-out', where: 'Transfer Orders', d: 'Stock per branch, transfer requests, approvals and receipts with shortages.', use: 'The main godown refills three branch stores every morning.' },
+      { t: 'Category & brand-wise sales', shot: 'reports-sales', where: 'Reports › Sales', d: 'Sales, profit and share by department (category), brand, counter and cashier.', use: 'Find which department gives the best margin this quarter.' },
+      { t: 'Stock analysis', shot: 'stock-analysis', where: 'Reports › Stock Analysis', d: 'Pivot of stock by item type, brand, location and category with closing stock on any date.', use: 'Compare closing stock of every department across branches.' },
+      { t: 'Gift vouchers & coupons', text: true, where: 'Promotions › Gift Vouchers · Discount Coupons', d: 'Sell gift vouchers with unique codes and balances; issue coupon series for campaigns.', use: 'Corporate Diwali gift vouchers of ₹1,000 each, redeemed at any counter.' },
+    ] },
+  { id: 'apparel', name: 'Apparel & Readymade Garments', color: '#7a4a7d', letter: 'A', intro: 'One design in many sizes and colours, labels on every piece, exchanges every day.', chips: ['key:Size / colour matrix', 'key:Barcode labels', 'key:Exchange', 'Offers', 'Coupons', 'Loyalty'],
+    items: [
+      { t: 'Size & colour matrix items', shot: 'matrix-size-colour', where: 'Inventory › Product (Matrix) · Sales Bill', d: 'Create a design once with all its sizes and colours. Every combination has its own SKU, barcode and stock; the bill shows the whole grid so you enter quantities for several sizes at once.', use: 'A T-shirt in Red / Blue × S / M / L — 6 SKUs created in one step and billed from one window.' },
+      { t: 'Labels for every piece', shot: 'print-barcodes', where: 'Inventory › Print Barcodes', d: 'Print a barcode label for each piece received with size, colour and MRP.', use: 'New stock of 300 pieces is labelled straight from the receipt note.' },
+      { t: 'Exchange & returns', shot: 'sales-return', where: 'Sales › Sales Returns · Sales Bill › Return / Exchange', d: 'Return a size and use the value as credit on the new bill; the returned piece goes back to the same stock barcode.', use: 'A customer exchanges a Medium for a Large and pays only the difference.' },
+      { t: 'Season offers & coupons', shot: 'offers', where: 'Promotions', d: 'Flat 30% on a category, buy 2 get 1, and coupons for the next visit.', use: 'End-of-season sale: 40% off on all summer wear for 10 days.' },
+    ] },
+  { id: 'mobile', name: 'Mobile Store & Electronics Shop', color: '#165a63', letter: 'M', intro: 'Every unit has an IMEI or serial number, a warranty and often an advance or EMI.', chips: ['key:Serial / IMEI', 'key:Warranty & guarantee', 'key:Sales Order advance', 'EMI tender', 'Exchange'],
+    items: [
+      { t: 'Serial / IMEI tracking', shot: 'serial-pick', where: 'Sales Bill › item window · Purchase', d: 'Enter IMEI / serial numbers when you receive stock; pick the exact unit when billing (scan or tick with Space). Every unit’s history — purchase, sale, return — is kept.', list: ['Second serial and extra attributes (colour, storage)', 'Scan a serial on the bill to add it directly', 'Serial stock per location'], use: 'A customer’s phone has a fault — search the IMEI to see the bill, date and warranty in seconds.' },
+      { t: 'Warranty & guarantee desk', shot: 'warranty', where: 'Sales › Warranty & Guarantee', d: 'Look up any serial, IMEI, bill or customer to see warranty and replacement-guarantee dates, log claims and track repairs.', use: 'A TV under replacement guarantee is swapped and the new serial is linked to the old bill.' },
+      { t: 'Sales Order with advance', text: true, where: 'Sales › Sales Order', d: 'Book a model that is not in stock, take an advance (cash / UPI / card) and use it automatically when the bill is made. Unused advances can be refunded.', use: 'A customer pays ₹5,000 advance for a phone arriving next week; the bill deducts it automatically.' },
+      { t: 'EMI and card tenders', shot: 'payment', where: 'Sales Bill › Payment', d: 'Record EMI / finance, card and UPI payments with reference numbers, split across tenders.', use: '₹30,990 TV: ₹5,000 down payment by card, ₹25,990 on EMI.' },
+    ] },
+  { id: 'books', name: 'Book Shop & Stationery', color: '#a8862b', letter: 'B', intro: 'Thousands of titles, ISBN barcodes, school-season orders and credit for institutions.', chips: ['key:ISBN / barcode scan', 'key:School orders & advance', 'Credit customers', 'Price list', 'Category reports'],
+    items: [
+      { t: 'Scan ISBN to bill', shot: 'sales-bill', where: 'Sales › Sales Bill', d: 'The ISBN / EAN printed on the book is its barcode — scan and bill. Several codes per item are supported.', use: 'During the school season every title is billed by scanning, with no item codes to remember.' },
+      { t: 'School & bulk orders', text: true, where: 'Sales › Sales Quotation · Sales Order', d: 'Quote a school’s book list, convert it to an order, take an advance and deliver in parts.', use: 'A school orders 200 sets; 120 are delivered now and the rest when stock arrives.' },
+      { t: 'Credit for institutions', shot: 'collections', where: 'Sales › Outstanding Collection & Refunds', d: 'Bill schools, colleges and offices on credit and collect monthly with aging.', use: 'A college pays its monthly stationery bill; the payment clears all its open bills.' },
+      { t: 'Category-wise sales', shot: 'reports-sales', where: 'Reports › Sales', d: 'Sales by category (textbooks, notebooks, stationery) and by publisher (brand).', use: 'See which publisher sold best this school season.' },
+    ] },
+  { id: 'liquor', name: 'Liquor / Wine Shop & Bar', color: '#8a2b3d', letter: 'L', intro: 'Excise registers, MRP rules, permits, dry days, bar pegs and state taxes — built in for Maharashtra and Goa.', chips: ['key:Excise registers', 'key:Bar billing (pegs)', 'key:Goa VAT / CST / C-Form', 'Licences', 'Dry-day lock', 'Age & permit checks'],
+    items: [
+      { t: 'Liquor items by brand & size', shot: 'liquor-items', where: 'Liquor Shop › Liquor Items', d: 'Every brand with its sizes (180 / 375 / 750 ml …), strength, case pack, MRP and stock in bottles, cases and bulk litres.', use: 'See at a glance how many cases and loose bottles of each brand are in stock.' },
+      { t: 'Scan a bottle to add it', shot: 'liquor-add-brand', where: 'Liquor Items › Add brand & sizes', d: 'Scan a bottle barcode — name, brand, category, size, strength, case pack, MRP and prices fill in by themselves. Add all sizes of a brand in one go.', use: 'A new brand arrives; scanning one bottle of each size creates all the items in a minute.' },
+      { t: 'Bar billing (pegs)', shot: 'liquor-bar', where: 'Liquor Shop › Bar Billing', d: 'Sell by the peg or the full bottle from the bar licence; open bottles and the millilitres poured are tracked automatically, with guest age and permit checks.', use: 'Table 4 orders three pegs of whisky — the open bottle’s balance reduces on its own.' },
+      { t: 'Excise & liquor reports', shot: 'liquor-reports', where: 'Liquor Shop › Excise & Liquor Reports', d: 'Daily excise register, brand-wise sales, TP / transport-permit register, permit register, closing stock in bottles and bulk litres, MRP check and opening & closing statement (horizontal / vertical).', use: 'Print the monthly excise register for the excise inspector.' },
+      { t: 'Licences & rules', shot: 'liquor-setup', where: 'Liquor Shop › Licences & Liquor Rules', d: 'FL-II, FL-III, CL-III (Maharashtra) and Goa retail / bar licences with validity, minimum age, permit requirement, strict MRP and dry days that block sales.', use: 'On a declared dry day the counter cannot bill liquor.' },
+      { t: 'Goa VAT, CST & C-Form', shot: 'liquor-vat', where: 'Licences & Liquor Rules › VAT / CST', d: 'State VAT on liquor (outside GST), CST on purchases from other states with or without C-Form, and VAT purchase / sales / summary registers.', use: 'A Goa shop buys from Kolhapur — CST at 2% with C-Form is added to the purchase invoice.' },
+      { t: 'Liquor purchase with TP details', shot: 'liquor-purchase', where: 'Purchase › Purchase invoice', d: 'Transport permit (TP) details and CST / VAT are captured on the purchase invoice, along with the licence the stock is received under.', use: 'Each consignment’s TP number is recorded and appears in the TP register.' },
+    ] },
+  { id: 'service', name: 'Bike & Car Service Center', color: '#c2703d', letter: 'S', intro: 'A complete workshop: reception, job cards, estimates, parts and labour, delivery and service reminders.', chips: ['key:Workshop board', 'key:Job cards', 'key:Service reminders', 'Estimates on WhatsApp', 'Parts & labour billing'],
+    items: [
+      { t: 'Workshop board', shot: 'service-board', where: 'Vehicle Service › Workshop board', d: 'Every vehicle in the workshop by stage — reception, approval, on the floor, quality check, ready for delivery — with mechanic, waiting time and amount.', use: 'The manager sees that 3 vehicles are waiting for parts and calls the supplier.' },
+      { t: 'New job card (check-in)', shot: 'service-new', where: 'Vehicle Service › New job card', d: 'Find the customer by mobile or registration number, record complaints, odometer, fuel and a walk-around of belongings at reception.', use: 'A bike is checked in with “brake noise” and 50% fuel in under a minute.' },
+      { t: 'Job card: estimate to invoice', shot: 'job-card', where: 'Vehicle Service › Job cards', d: 'Add work and parts, send the estimate on WhatsApp, record customer approval, assign mechanics, do quality check and invoice with payments.', use: 'The customer approves the estimate on WhatsApp and the job moves to “in progress”.' },
+      { t: 'All job cards', shot: 'service-jobs', where: 'Vehicle Service › Job cards', d: 'Search and filter jobs by status, vehicle, customer or mechanic with amounts and balances.', use: 'List all jobs waiting for approval since yesterday.' },
+      { t: 'Service due & renewals', shot: 'service-reminders', where: 'Vehicle Service › Service due & renewals', d: 'Next service by date or kilometres, insurance and PUC renewals — call or WhatsApp customers before they are due.', use: 'Every Monday the front desk sends reminders for services due this week.' },
+    ] },
+];
+
+const sections = document.getElementById('sections');
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+sections.innerHTML = BIZ.map((b) => `
+  <section class="biz" id="${b.id}">
+    <div class="biz-head"><span class="dot" style="background:${b.color}">${b.letter}</span><div><h2>${esc(b.name)}</h2><p>${esc(b.intro)}</p></div></div>
+    ${b.chips.length ? `<div class="chips">${b.chips.map((c) => c.startsWith('key:') ? `<span class="key">Key · ${esc(c.slice(4))}</span>` : `<span>${esc(c)}</span>`).join('')}</div>` : ''}
+    <div class="grid">${b.items.map((f) => `
+      <article class="card${f.text ? ' text' : ''}" data-text="${esc([b.name, f.t, f.d, f.use, f.where, ...(f.list || [])].join(' ').toLowerCase())}">
+        ${f.shot ? `<figure data-src="/features/img/${f.shot}.jpg" data-cap="${esc(f.t)}"><img loading="lazy" src="/features/img/${f.shot}.jpg" alt="${esc(f.t)} screen in SKPOS" width="1366" height="768"></figure>` : ''}
+        <div class="body">
+          <h3>${esc(f.t)}</h3>
+          <div class="where">Where: <b>${esc(f.where)}</b></div>
+          <p>${esc(f.d)}</p>
+          ${f.list ? `<ul>${f.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+          <div class="use"><b>Use case:</b> ${esc(f.use)}</div>
+        </div>
+      </article>`).join('')}</div>
+  </section>`).join('');
+
+// search
+const q = document.getElementById('q');
+q.addEventListener('input', () => {
+  const s = q.value.trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll('#sections section.biz').forEach((sec) => {
+    let n = 0;
+    sec.querySelectorAll('.card').forEach((c) => { const on = !s || c.dataset.text.includes(s); c.classList.toggle('hide', !on); if (on) n += 1; });
+    sec.classList.toggle('hide', n === 0); shown += n;
+  });
+  ['packages', 'keys', 'faq'].forEach((id) => document.getElementById(id).classList.toggle('hide', Boolean(s)));
+  document.getElementById('empty').style.display = shown ? 'none' : 'block';
+});
+
+// screenshot zoom
+const lb = document.getElementById('lb');
+document.addEventListener('click', (e) => {
+  const fig = e.target.closest('figure[data-src]');
+  if (fig) { lb.querySelector('img').src = fig.dataset.src; lb.querySelector('p').textContent = fig.dataset.cap; lb.classList.add('on'); return; }
+  if (e.target.closest('#lb')) lb.classList.remove('on');
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') lb.classList.remove('on'); if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); q.focus(); } });
+
+// highlight the section in view
+const links = [...document.querySelectorAll('#side a')];
+const obs = new IntersectionObserver((entries) => {
+  entries.forEach((en) => { if (en.isIntersecting) links.forEach((a) => a.classList.toggle('on', a.getAttribute('href') === `#${en.target.id}`)); });
+}, { rootMargin: '-40% 0px -55% 0px' });
+document.querySelectorAll('section.biz').forEach((s) => obs.observe(s));
+// /features?type=liquor also works
+const type = new URLSearchParams(location.search).get('type');
+if (type && document.getElementById(type)) document.getElementById(type).scrollIntoView();
+</script>
+</body>
+</html>
