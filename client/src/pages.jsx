@@ -1,3 +1,6 @@
+import { AccountsPage } from './accounts.jsx';
+import { ReportsPage } from './reports.jsx';
+import { SalesConfigPage } from './sales-config.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -34,6 +37,7 @@ import { BarcodePrintPage } from './barcode-print.jsx';
 import { StockAnalysisPage } from './stock-analysis.jsx';
 import { OrgStructurePage } from './org-structure.jsx';
 import { WarrantyPage } from './warranty.jsx';
+import { BarBillingPage, LiquorItemsPage, LiquorReportsPage, LiquorSetupPage, OpenBottlesPage } from './liquor.jsx';
 import { UnitConversionPage } from './unit-conversion.jsx';
 import { RepackPage } from './repack.jsx';
 import { PrintTemplatesPage } from './print-templates.jsx';
@@ -60,14 +64,14 @@ const FEATURES = {
 
 const DOC_LABELS = {
   purchase: { order: 'Purchase Order', receipt: 'Receipt Note', invoice: 'Purchase invoice' },
-  sales: { quotation: 'Sales Quotation', order: 'Sales Order', bill: 'Sales Bill' },
+  sales: { quotation: 'Sales Quotation', order: 'Sales Order', bill: 'Sales Bill', return: 'Sales Returns' },
   reports: { masters: 'Masters', sales: 'Sales', purchase: 'Purchase', stock: 'Stock Transactions', promotions: 'Promotions' },
 };
 
 const LABELS = {
   catalogue: 'Catalogue', stock: 'Stock', purchase: 'Purchase', sales: 'Sales', customers: 'Customers',
   reports: 'Reports', users: 'Users', settings: 'Settings', notifications: 'Notifications',
-  serial: 'Serial numbers', warranty: 'Warranty', bike_service: 'Vehicle service',
+  serial: 'Serial numbers', warranty: 'Warranty', bike_service: 'Vehicle service', liquor: 'Liquor Shop (excise, bar & permits)',
 };
 
 function money(value) {
@@ -848,10 +852,18 @@ export function MenuPage() {
   if (slug === 'price-list') return <PriceListPage />;
   if (slug === 'price-updates') return <PriceUpdatePage />;
   if (slug === 'purchase-config') return <PurchaseConfigPage />;
+  if (slug === 'sales-config') return <SalesConfigPage />;
   if (slug === 'print-barcodes') return <BarcodePrintPage />;
   if (slug === 'stock-analysis') return <StockAnalysisPage />;
   if (slug === 'org-structure') return <OrgStructurePage />;
   if (slug === 'warranty') return <WarrantyPage />;
+  if (slug === 'customer-collections') return <AccountsPage key="customer" kind="customer" />;
+  if (slug === 'supplier-payments') return <AccountsPage key="supplier" kind="supplier" />;
+  if (slug === 'liquor-items') return <LiquorItemsPage />;
+  if (slug === 'liquor-bar') return <BarBillingPage />;
+  if (slug === 'liquor-bottles') return <OpenBottlesPage />;
+  if (slug === 'liquor-reports') return <LiquorReportsPage />;
+  if (slug === 'liquor-setup') return <LiquorSetupPage />;
   if (slug === 'unit-conversion') return <UnitConversionPage />;
   if (slug === 'repacking') return <RepackPage />;
   if (slug === 'print-templates') return <PrintTemplatesPage />;
@@ -898,6 +910,7 @@ export function ModulePage() {
   }, [feature, meta, request]);
 
   if (!meta) return <p className="banner">That page is not part of SKPOS.</p>;
+  if (feature === 'reports' && docTitle) return <ReportsPage key={doc} group={doc} />;
   if ((feature === 'sales' || feature === 'purchase') && docTitle) {
     return <DocumentsPage key={`${feature}-${doc}`} module={feature} type={doc} />;
   }

@@ -9,7 +9,8 @@ import {
   trialPlanCode,
 } from '../shared/domain.mjs';
 import { hashPassword } from './auth.mjs';
-import { TRIAL_DAYS, TRIAL_PACKAGE, defaultOnModules } from '../shared/licensing.mjs';
+import { TRIAL_DAYS, TRIAL_PACKAGE, registrationModules } from '../shared/licensing.mjs';
+import { readTypeMapping } from './type-mapping.mjs';
 import { newId, slugify } from './ids.mjs';
 
 export function planByCode(code) {
@@ -56,11 +57,13 @@ export async function provisionTenant(store, input) {
     address: input.address ? JSON.stringify(input.address) : '',
     geo: input.geo ? JSON.stringify(input.geo) : '',
   });
+  // modules on for the company type (Admin Panel → Company Types & Features)
+  const startOn = registrationModules(input.businessType, input.companyType, await readTypeMapping(store));
   for (const key of FEATURE_KEYS) {
     await store.insert('settings', {
       company_id: company.id,
       setting_key: key,
-      setting_value: defaultOnModules(input.businessType, input.companyType).includes(key) ? '1' : '0',
+      setting_value: startOn.includes(key) ? '1' : '0',
     });
   }
   const location = await store.insert('locations', {

@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api.js';
+import { readSid, saveSid } from './activity.js';
 
 const AuthContext = createContext(null);
+
 const TOKEN_KEY = 'sk_access';
 
 function sessionFrom(result) {
@@ -64,18 +66,22 @@ export function AuthProvider({ children }) {
 
   const signIn = useCallback(async (email, password) => {
     const result = await api('/auth/login', { method: 'POST', body: { email, password } });
+    saveSid(result.sid || '');
     apply(result.accessToken, sessionFrom(result));
   }, [apply]);
 
   const signUp = useCallback(async (body) => {
     const result = await api('/auth/signup', { method: 'POST', body });
+    saveSid(result.sid || '');
     apply(result.accessToken, sessionFrom(result));
   }, [apply]);
 
   const signOut = useCallback(async () => {
     try {
+      try { if (tokenRef.current && readSid()) await api('/activity/end', { method: 'POST', body: {}, token: tokenRef.current }); } catch { /* best effort */ }
       await api('/auth/logout', { method: 'POST' });
     } finally {
+      saveSid('');
       clear();
     }
   }, [clear]);

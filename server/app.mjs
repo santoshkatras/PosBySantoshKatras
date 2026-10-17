@@ -27,6 +27,10 @@ import { registerDataCleanup } from './data-cleanup.mjs';
 import { registerStockReport } from './stock-report.mjs';
 import { registerOrgStructure } from './org-structure.mjs';
 import { registerWarranty } from './warranty.mjs';
+import { registerLiquor } from './liquor.mjs';
+import { createAccounts } from './accounts.mjs';
+import { registerReports } from './reports.mjs';
+import { createActivity } from './activity.mjs';
 import { cleanWarranty, warrantyProblem } from '../shared/warranty.mjs';
 import { ITEM_TYPES, alertAt, alertLevelAt, batchKey, cleanBatchRule, cleanStockLevels, makeBatchNo, reorderAt, typeFromItem, typeOf } from '../shared/item-types.mjs';
 import { registerUom, unitResolver } from './uom.mjs';
@@ -220,6 +224,11 @@ const FEATURE_GATES = [
   ['/api/reports/stock-analysis', ['stock-analysis'], false, 'Stock Analysis'],
   ['/api/migration', ['data-migration'], false, 'Data Migration'],
   ['/api/data-cleanup', ['data-cleanup'], false, 'Data Cleanup'],
+  ['/api/liquor/bar', ['liquor-bar'], true, 'Bar Billing (Peg)'],
+  ['/api/liquor/bottles', ['liquor-bottles', 'liquor-bar'], true, 'Open Bottles (Bar)'],
+  ['/api/liquor/items', ['liquor-items'], true, 'Liquor Items'],
+  ['/api/liquor/lookup', ['liquor-items'], false, 'Liquor Items'],
+  ['/api/liquor/reports', ['liquor-reports'], false, 'Excise & Liquor Reports'],
 ];
 function featureBlock(req, session) {
   const off = session.disabledFeatures || [];
@@ -307,6 +316,8 @@ export async function createApp(options = {}) {
   setTimeout(() => { lots.sweepAll().catch((err) => console.error('stock barcode sweep:', err.message)); }, 1500);
   let seeded = false;
   app.use(express.json({ limit: '1mb' }));
+  const activity = createActivity(store);
+  app.use(activity.middleware);
   app.use(route(async (req, _res, next) => {
     store.attach?.(req);
     if (process.env.X_ZOHO_CATALYST_LISTEN_PORT && !seeded) {
@@ -364,7 +375,9 @@ export async function createApp(options = {}) {
     const existing = await store.find('users', { email });
     if (existing.length) return fail(res, 409, 'EMAIL_TAKEN', 'That email is already registered.');
     const created = await provisionTenant(store, { ...body, email, package: undefined, licenseMode: undefined });
-    res.status(201).json(await issue(store, res, created.userId, created.companyId));
+    const [newUser] = await store.find('users', { id: created.userId });
+    const sid = newUser ? await activity.startSession(req, newUser).catch(() => '') : '';
+    res.status(201).json({ ...(await issue(store, res, created.userId, created.companyId)), sid });
   }));
 
   // Start 15 Day's Trial → pincode fills area, city, district and state (India Post directory)
@@ -402,13 +415,15 @@ export async function createApp(options = {}) {
     if (!user || !verifyPassword(String(req.body?.password || ''), user.password_hash)) {
       hit.count += 1;
       loginHits.set(ip, hit);
+      await activity.failedLogin(req, email, user, user ? 'Wrong password' : 'Unknown email').catch(() => {});
       return fail(res, 401, 'INVALID_LOGIN', 'Email or password is incorrect.');
     }
     loginHits.set(ip, { count: 0, at: Date.now() });
     const [company] = await store.find('companies', { id: user.company_id });
-    if (company?.status === 'suspended') return fail(res, 403, 'COMPANY_DISABLED', 'This business account is disabled. Contact SKPOS support.');
-    if (user.status !== 'active') return fail(res, 403, 'USER_DISABLED', 'Your user account is not active. Ask the owner.');
-    res.json(await issue(store, res, user.id, user.company_id));
+    if (company?.status === 'suspended') { await activity.failedLogin(req, email, user, 'Company disabled').catch(() => {}); return fail(res, 403, 'COMPANY_DISABLED', 'This business account is disabled. Contact SKPOS support.'); }
+    if (user.status !== 'active') { await activity.failedLogin(req, email, user, 'User not active').catch(() => {}); return fail(res, 403, 'USER_DISABLED', 'Your user account is not active. Ask the owner.'); }
+    const sid = await activity.startSession(req, user).catch(() => '');
+    res.json({ ...(await issue(store, res, user.id, user.company_id)), sid });
   }));
 
   app.post('/api/auth/refresh', route(async (req, res) => {
@@ -435,6 +450,7 @@ export async function createApp(options = {}) {
   }));
 
   const auth = requireUser(store);
+  activity.register(app, { auth, route, fail });
   app.get('/api/auth/me', auth, (req, res) => res.json(req.session));
 
   app.get('/api/dashboard/summary', auth, allow('dashboard.view'), route(async (req, res) => {
@@ -718,6 +734,24 @@ export async function createApp(options = {}) {
       await changeStock(req, { locationId: item.locationId, variantId: variant.id, delta: opening, reason: 'opening', type: 'opening', note: 'Opening stock at item creation', price: { mrp: item.mrp, salePrice: item.salePrice, costPrice: item.costPrice }, lots: [], source: 'Item creation' });
     }
     return product;
+  }
+
+  // Liquor Items → Add brand & sizes: a standard item (bottle unit, Item Type = its liquor category)
+  async function quickItem(req, input) {
+    const categories = await store.find('categories', { company_id: req.companyId });
+    const top = categories.filter((row) => !row.parent_id);
+    const find = (name) => top.find((row) => row.name.toLowerCase() === String(name || '').toLowerCase());
+    const category = find(input.categoryName) || find(input.groupName) || await store.insert('categories', { company_id: req.companyId, name: input.categoryName });
+    const units = await store.find('units', { company_id: req.companyId });
+    const unit = units.find((u) => u.code === input.unitCode) || units.find((u) => /^bottle/i.test(u.name)) || units.find((u) => u.code === 'pcs') || units[0];
+    const sku = await nextSku(req.companyId, input.name);
+    const product = await createItem(req, {
+      name: input.name, categoryId: category.id, brandId: await brandIdFor(req.companyId, input.brandName), unitId: unit?.id || '', hsnSac: input.hsn, gstRate: input.gst,
+      trackingType: 'none', sku, barcode: input.barcode, mrp: input.mrp, salePrice: input.salePrice, costPrice: input.costPrice, minStock: 0,
+      profile: { kind: 'grocery', itemType: 'standard', stockLevels: cleanStockLevels({}), reorderAlert: true, batch: cleanBatchRule({}), slots: {}, matrix: [], upc: '', image: '', notes: '', settings: cleanItemSettings({}), expiry: cleanExpiry({}), warranty: cleanWarranty({}), source: cleanSource({}) },
+    });
+    const [variant] = await store.find('variants', { company_id: req.companyId, product_id: product.id });
+    return variant.id;
   }
 
   async function openingLocation(req, locationId) {
@@ -2578,7 +2612,11 @@ export async function createApp(options = {}) {
   registerPrintTemplates(app, store, { auth, allow, route, fail, writeSetting });
   registerUom(app, store, { auth, allow, route, fail, writeSetting, catalogueMeta });
   registerWarranty(app, store, { auth, allow, route, fail, on, locationAllowed, changeStock, stockLocation });
-  registerDocuments(app, store, { auth, allow, route, fail, locationAllowed, scopedLocations, pickerItems, changeStock, receiveSerials, stockLocation, money, qty, on, expiryOf, addBatches, consumeBatches, promotions, lots, org, fillBatchNos, childTarget, unitResolver });
+  const liquor = registerLiquor(app, store, { auth, allow, route, fail, locationAllowed, changeStock, stockLocation, writeSetting, quickItem });
+  const accounts = createAccounts(store, { auth, allow, route, fail, locationAllowed });
+  accounts.register(app);
+  registerReports(app, store, { auth, allow, route, fail, locationAllowed, accounts });
+  registerDocuments(app, store, { auth, allow, route, fail, locationAllowed, scopedLocations, pickerItems, changeStock, receiveSerials, stockLocation, money, qty, on, expiryOf, addBatches, consumeBatches, promotions, lots, org, fillBatchNos, childTarget, unitResolver, liquor, accounts });
 
   app.get('/api/vertical/:feature/status', auth, (req, res) => {
     const map = { serial: 'serial', warranty: 'warranty', 'bike-service': 'bike_service', purchase: 'purchase', sales: 'sales', customers: 'customers', reports: 'reports', notifications: 'notifications' };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MaxButton } from './maximize.jsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from './auth.jsx';
 import { useFeedback } from './feedback.jsx';
@@ -318,7 +319,7 @@ function TransferWindow({ kind, source, onClose, onSaved }) {
             <h2>{source ? `${meta.label} against ${source.number}` : `Create ${meta.label}`}</h2>
             <p>{kind === 'request' ? 'Ask another location to send stock to your location. Once approved, the supplying location dispatches it with a Transfer Out.' : 'Send stock from your location to another. Stock leaves the source on dispatch and is in transit until the destination records a Transfer In.'}</p>
           </div>
-          <button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
+          <MaxButton /><button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
         </header>
         <div className="ose-head dc-head">
           <label>{meta.prefix} No.<input value={setup?.nextNumber?.[kind] || '…'} readOnly className="mono" /></label>
@@ -484,7 +485,7 @@ function ReceiveWindow({ outNumber, onClose, onSaved }) {
       <div className="ose-window dc-window tr-window" role="dialog" aria-modal="true" aria-label="Create Transfer In">
         <header className="ose-top">
           <div className="ose-title"><h2>Create Transfer In</h2><p>Receive stock dispatched to your location. Record damaged items, and tick “Final receipt” to close the transfer — anything not received becomes a shortage.</p></div>
-          <button type="button" className="ose-x" aria-label="Close" onClick={onClose}>×</button>
+          <MaxButton /><button type="button" className="ose-x" aria-label="Close" onClick={onClose}>×</button>
         </header>
         <div className="ose-head dc-head">
           <label className="grow">Transfer Out (in transit to you)

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MaxButton } from './maximize.jsx';
 import { useAuth } from './auth.jsx';
 import { useFeedback } from './feedback.jsx';
 import { useFitHeight } from './fit-height.js';
@@ -290,7 +291,7 @@ function WastageWindow({ onClose, onSaved }) {
       <div className="ose-window dc-window tr-window ws-window" role="dialog" aria-modal="true" aria-label="Create Wastage Entry">
         <header className="ose-top">
           <div className="ose-title"><h2>Create Wastage Entry</h2><p>Write off damaged, expired, lost or consumed stock. Pick the wastage type, then add items — each item gets a reason. Stock is deducted at cost price.</p></div>
-          <button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
+          <MaxButton /><button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
         </header>
         <div className="ose-head dc-head">
           <label>Entry No.<input value={setup?.nextNumber || '…'} readOnly className="mono" /></label>

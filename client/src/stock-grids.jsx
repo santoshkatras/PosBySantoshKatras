@@ -180,8 +180,9 @@ export function SerialPicker({ serials, picked, onPick, fields, height = 300, se
     <div className="sg">
       <div className="sg-bar">
         <strong>{selectable ? `Selected: ${picked.length}` : `In stock: ${serials.length}`}</strong>
-        <input className="sg-search" placeholder={selectable ? 'Search or scan a serial, press Enter' : 'Search serial numbers'} value={query} onChange={(event) => setQuery(event.target.value)}
+        <input className="sg-search" placeholder={selectable ? 'Search / scan a serial + Enter · ↓ then Space to tick' : 'Search serial numbers'} value={query} onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' && selectable) { const first = event.currentTarget.closest('.sg')?.querySelector('tbody tr[data-kb-row]'); if (first) { event.preventDefault(); first.focus(); } return; }
             if (event.key !== 'Enter' || !selectable) return;
             event.preventDefault();
             const hit = serials.find((row) => [...SERIAL_KEYS, 'barcode'].some((key) => row[key] && String(row[key]).toUpperCase() === query.trim().toUpperCase()));
@@ -202,8 +203,8 @@ export function SerialPicker({ serials, picked, onPick, fields, height = 300, se
           </thead>
           <tbody>
             {shown.map((row, index) => (
-              <tr key={row.id} className={picked.includes(row.id) ? 'sg-on' : undefined} onClick={selectable ? () => toggle(row.id) : undefined} style={selectable ? { cursor: 'pointer' } : undefined}>
-                <td className="sg-num">{selectable ? <input type="checkbox" readOnly checked={picked.includes(row.id)} aria-label={`Select ${row.serial1}`} /> : index + 1}</td>
+              <tr key={row.id} className={picked.includes(row.id) ? 'sg-on' : undefined} onClick={selectable ? () => toggle(row.id) : undefined} style={selectable ? { cursor: 'pointer' } : undefined} {...(selectable ? { 'data-kb-row': '', tabIndex: 0 } : {})}>
+                <td className="sg-num">{selectable ? <input type="checkbox" readOnly tabIndex={-1} checked={picked.includes(row.id)} aria-label={`Select ${row.serial1}`} /> : index + 1}</td>
                 {fieldList.map((field) => <td key={field.key} className={`sg-cell${SERIAL_KEYS.includes(field.key) ? ' mono' : ''}`}>{row[field.key] || '—'}</td>)}
                 {extraCols.map((col) => <td key={col.key} className={col.num ? 'sg-x num' : 'sg-x'}>{col.render(row)}</td>)}
                 <td className="sg-qty"><span className="sg-one">1</span></td>

@@ -1,3 +1,4 @@
+import { focusNext } from './keyboard.js';
 import { useEffect, useRef, useState } from 'react';
 import './search-select.css';
 
@@ -69,6 +70,15 @@ export function SearchSelect({ value, onChange, options, placeholder = 'Choose',
         onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            const el = event.currentTarget;
+            if (query.trim() && rows.length) pick(Math.min(active, rows.length - 1));
+            else if (!query.trim() && !selected && rows.length && active > 0) pick(active);
+            setOpen(false);
+            focusNext(el, event.shiftKey);
+            return;
+          }
           const moved = moveActive(event, rows.length, active, setActive, pick);
           if (moved === 'close') setOpen(false);
         }}

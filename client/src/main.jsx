@@ -8,6 +8,9 @@ import { FeedbackProvider } from './feedback.jsx';
 import './hrms.css';
 import './extra.css';
 import './tables.css';
+import { installKeyboard } from './keyboard.js';
+
+installKeyboard();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

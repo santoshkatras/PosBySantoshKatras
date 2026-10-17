@@ -253,7 +253,7 @@ function TypeSelect({ value, onChange, error }) {
           {shown.length ? shown.map(([id, label], i) => (
             <li key={id} role="option" aria-selected={id === value} className={`${i === active ? 'act' : ''}${id === value ? ' sel' : ''}`} onMouseEnter={() => setActive(i)} onMouseDown={(e) => { e.preventDefault(); pick(id); }}>
               <span className={`ax-ti t-${id}`}>{label.slice(0, 1)}</span>{label}
-              {id === 'bike_service' ? <small>Vehicle Service workshop</small> : ['mobile_store', 'electronics'].includes(id) ? <small>Serial / IMEI &amp; warranty on</small> : null}
+              {id === 'bike_service' ? <small>Vehicle Service workshop</small> : ['mobile_store', 'electronics'].includes(id) ? <small>Serial / IMEI &amp; warranty on</small> : id === 'liquor_shop' ? <small>Excise registers, bar &amp; permits</small> : null}
               {id === value ? <I n="check" className="ax-tick" /> : null}
             </li>
           )) : <li className="ax-none">No company type matches</li>}

@@ -31,7 +31,7 @@ function Modal({ title, subtitle, wide, onClose, footer, children }) {
 }
 
 // ---------- Return / Exchange ----------
-export function ReturnExchangePopup({ locationId, registerId = '', onClose, onDone, onUseCredit }) {
+export function ReturnExchangePopup({ locationId, registerId = '', onClose, onDone, onUseCredit, standalone = false }) {
   const { request } = useAuth();
   const feedback = useFeedback();
   const [tab, setTab] = useState('return');
@@ -71,11 +71,17 @@ export function ReturnExchangePopup({ locationId, registerId = '', onClose, onDo
     const over = rows.find((row) => row.kind !== 'serial' && baseTake(row) > row.left + 0.0001);
     if (over) { setError(`${over.name}: only ${both(over, over.left)} can be returned.`); return; }
     if (!lines.length && !serials.length) { setError('Enter the quantity (or tick the serial numbers) being returned.'); return; }
-    const ok = await feedback.confirm({ title: mode === 'exchange' ? 'Return for exchange?' : 'Return and refund?', message: mode === 'exchange' ? `${inr(value)} becomes credit on this bill. The returned stock goes back into the location.` : `Refund ${inr(value)} in cash to the customer. The returned stock goes back into the location.`, confirmLabel: mode === 'exchange' ? 'Return & use credit' : 'Return & refund' });
+    const text = {
+      exchange: standalone ? ['Return for exchange credit?', `${inr(value)} is kept as exchange credit on the Sales Return number — use it later in a Sales Bill (Return / Exchange → Use an earlier return credit).`, 'Return & keep credit']
+        : ['Return for exchange?', `${inr(value)} becomes credit on this bill.`, 'Return & use credit'],
+      account: ['Credit to customer account?', `${inr(value)} is credited to ${bill.partyName}'s account: it first clears what is outstanding on ${bill.number}; anything left stays on account (adjust to a later bill or refund it from Outstanding Collection).`, 'Return & credit account'],
+      refund: ['Return and refund?', `Refund ${inr(value)} in cash to the customer.`, 'Return & refund'],
+    }[mode];
+    const ok = await feedback.confirm({ title: text[0], message: `${text[1]} The returned stock goes back into the location.`, confirmLabel: text[2] });
     if (!ok) return;
     setPending(true);
     try {
-      const result = await request('/sales-returns', { method: 'POST', body: { billNumber: bill.number, locationId, registerId, reason, note, mode, lines, serials } });
+      const result = await request('/sales-returns', { method: 'POST', body: { billNumber: bill.number, locationId: locationId || bill.locationId, registerId, reason, note, mode, lines, serials } });
       onDone(result);
     } catch (err) { setError(message(err)); } finally { setPending(false); }
   }
@@ -90,13 +96,14 @@ export function ReturnExchangePopup({ locationId, registerId = '', onClose, onDo
     } catch (err) { setError(message(err)); }
   }
   return (
-    <Modal wide title="Return / Exchange" subtitle="Goods come back into stock (same stock barcodes and serial numbers). Refund in cash, or use the value as credit on this bill." onClose={onClose}
+    <Modal wide title={standalone ? 'Create Sales Return' : 'Return / Exchange'} subtitle={standalone ? 'Goods come back into stock (same stock barcodes and serial numbers). Refund in cash, credit the customer account, or keep it as exchange credit.' : 'Goods come back into stock (same stock barcodes and serial numbers). Refund in cash, credit the customer account, or use the value as credit on this bill.'} onClose={onClose}
       footer={tab === 'return' ? (
         <>
           {error ? <span className="bt-error">{error}</span> : <span className="bt-hint">Return value <b>{inr(value)}</b></span>}
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
           <button type="button" className="btn" disabled={pending || !bill || !(value > 0)} onClick={() => submit('refund')}>Return &amp; refund cash</button>
-          <button type="button" className="btn primary" disabled={pending || !bill || !(value > 0)} onClick={() => submit('exchange')}>Exchange — use {inr(value)} in this bill</button>
+          {bill?.partyId ? <button type="button" className="btn" disabled={pending || !(value > 0)} title="Clears this bill's outstanding first; the rest stays on the customer's account" onClick={() => submit('account')}>Credit to customer account</button> : null}
+          <button type="button" className="btn primary" disabled={pending || !bill || !(value > 0)} onClick={() => submit('exchange')}>{standalone ? `Keep ${inr(value)} as exchange credit` : `Exchange — use ${inr(value)} in this bill`}</button>
         </>
       ) : (
         <>
@@ -105,10 +112,10 @@ export function ReturnExchangePopup({ locationId, registerId = '', onClose, onDo
           <button type="button" className="btn primary" onClick={useCredit}>Use credit</button>
         </>
       )}>
-      <div className="bt-tabs" role="tablist">
+      {standalone ? null : <div className="bt-tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'return'} className={tab === 'return' ? 'on' : undefined} onClick={() => setTab('return')}>Return items from a bill</button>
         <button type="button" role="tab" aria-selected={tab === 'credit'} className={tab === 'credit' ? 'on' : undefined} onClick={() => setTab('credit')}>Use an earlier return credit</button>
-      </div>
+      </div>}
       {tab === 'credit' ? (
         <div className="bt-row">
           <label className="bt-field">Sales Return no. (SR-…)<input autoFocus value={creditNo} placeholder="e.g. SR-0001" onChange={(event) => setCreditNo(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') useCredit(); }} /></label>

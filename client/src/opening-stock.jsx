@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { MaxButton } from './maximize.jsx';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from './api.js';
 import { createPortal } from 'react-dom';
@@ -592,7 +593,7 @@ export function OpeningEntryWindow({ onClose, onSaved }) {
             <h2>Create Opening Stock Entry</h2>
             <p>Type or scan an item code, or search by name. A window opens for the item type to enter quantity, serial numbers or variants.</p>
           </div>
-          <button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
+          <MaxButton /><button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
         </header>
         <div className="ose-head">
           <label>Entry No.<input value={number || '…'} readOnly className="mono" /></label>

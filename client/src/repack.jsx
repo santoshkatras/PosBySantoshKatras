@@ -1,5 +1,6 @@
 // Inventory → Repacking: pack bulk stock into Repackaged Items (e.g. 50 kg sugar bag → 1 kg packs).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MaxButton } from './maximize.jsx';
 import { useAuth } from './auth.jsx';
 import { useFeedback } from './feedback.jsx';
 import { useFitHeight } from './fit-height.js';
@@ -152,7 +153,7 @@ function RepackWindow({ onClose, onSaved }) {
             <h2>Create Repacking Entry</h2>
             <p>Type or scan a Repackaged Item code, or search by name. A window opens to enter the packs made, loss, batch and expiry.</p>
           </div>
-          <button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
+          <MaxButton /><button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
         </header>
         <div className="ose-head">
           <label>Entry No.<input value={setup?.nextNumber || '…'} readOnly className="mono" /></label>

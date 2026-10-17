@@ -9,13 +9,14 @@ export const COMPANY_TYPES = [
   ['book_shop', 'Book Shop'],
   ['mobile_store', 'Mobile Store'],
   ['electronics', 'Electronics Shop'],
+  ['liquor_shop', 'Liquor / Wine Shop & Bar'],
   ['other', 'Other'],
 ];
 export const companyTypeLabel = (companyType, businessType) => COMPANY_TYPES.find(([id]) => id === companyType)?.[1] || (businessType === 'bike_service' ? 'Car & bike service centre' : 'Computer shop');
 export const businessTypeOf = (companyType) => (companyType === 'bike_service' ? 'bike_service' : 'computer_shop');
 export const FEATURE_KEYS = [
   'catalogue', 'stock', 'purchase', 'sales', 'customers', 'reports',
-  'users', 'settings', 'notifications', 'serial', 'warranty', 'bike_service',
+  'users', 'settings', 'notifications', 'serial', 'warranty', 'bike_service', 'liquor',
 ];
 export const LOCKED_FEATURES = ['users', 'settings'];
 export const PERMISSIONS = [
@@ -59,6 +60,17 @@ export const NAV = [
     ],
   },
   {
+    id: 'liquor',
+    label: 'Liquor Shop',
+    children: [
+      { id: 'liquor-bar', href: '/menu/liquor-bar', label: 'Bar Billing (Peg)', tabLabel: 'Bar Billing', permission: 'sales.view', feature: 'liquor', ready: true },
+      { id: 'liquor-bottles', href: '/menu/liquor-bottles', label: 'Open Bottles (Bar)', permission: 'sales.view', feature: 'liquor', ready: true },
+      { id: 'liquor-items', href: '/menu/liquor-items', label: 'Liquor Items (Brand & Size)', tabLabel: 'Liquor Items', permission: 'catalogue.view', feature: 'liquor', ready: true },
+      { id: 'liquor-reports', href: '/menu/liquor-reports', label: 'Excise & Liquor Reports', tabLabel: 'Liquor Reports', permission: 'reports.view', feature: 'liquor', ready: true },
+      { id: 'liquor-setup', href: '/menu/liquor-setup', label: 'Licences & Liquor Rules', tabLabel: 'Liquor Setup', permission: 'settings.view', feature: 'liquor', ready: true },
+    ],
+  },
+  {
     id: 'inventory',
     label: 'Inventory',
     children: [
@@ -99,6 +111,7 @@ export const NAV = [
       { id: 'purchase-order', href: '/m/purchase?doc=order', label: 'Purchase Order', permission: 'purchase.view', feature: 'purchase', ready: true },
       { id: 'receipt-note', href: '/m/purchase?doc=receipt', label: 'Receipt Note', permission: 'purchase.view', feature: 'purchase', ready: true },
       { id: 'purchase-invoice', href: '/m/purchase?doc=invoice', label: 'Purchase invoice', permission: 'purchase.view', feature: 'purchase', ready: true },
+      { id: 'supplier-payments', href: '/menu/supplier-payments', label: 'Supplier Payments & Refunds', tabLabel: 'Supplier Payments', permission: 'purchase.view', feature: 'purchase', ready: true },
     ],
   },
   {
@@ -110,6 +123,7 @@ export const NAV = [
       { id: 'sales-order', href: '/m/sales?doc=order', label: 'Sales Order', permission: 'sales.view', feature: 'sales', ready: true },
       { id: 'sales-bill', href: '/m/sales?doc=bill', label: 'Sales Bill', permission: 'sales.view', feature: 'sales', ready: true },
       { id: 'sales-return', href: '/m/sales?doc=return', label: 'Sales Returns', permission: 'sales.view', feature: 'sales', ready: true },
+      { id: 'customer-collections', href: '/menu/customer-collections', label: 'Outstanding Collection & Refunds', tabLabel: 'Collections', permission: 'sales.view', feature: 'sales', ready: true },
       { id: 'warranty-desk', href: '/menu/warranty', label: 'Warranty & Guarantee', permission: 'sales.view', feature: 'sales', ready: true },
     ],
   },
@@ -128,11 +142,11 @@ export const NAV = [
     label: 'Reports',
     children: [
       { id: 'stock-analysis', href: '/menu/stock-analysis', label: 'Stock Analysis (Pivot)', permission: 'reports.view', feature: 'reports', ready: true },
-      { id: 'report-masters', href: '/m/reports?doc=masters', label: 'Masters', permission: 'reports.view', feature: 'reports', ready: false },
-      { id: 'report-sales', href: '/m/reports?doc=sales', label: 'Sales', permission: 'reports.view', feature: 'reports', ready: false },
-      { id: 'report-purchase', href: '/m/reports?doc=purchase', label: 'Purchase', permission: 'reports.view', feature: 'reports', ready: false },
-      { id: 'report-stock', href: '/m/reports?doc=stock', label: 'Stock Transactions', permission: 'reports.view', feature: 'reports', ready: false },
-      { id: 'report-promos', href: '/m/reports?doc=promotions', label: 'Promotions', permission: 'reports.view', feature: 'reports', ready: false },
+      { id: 'report-masters', href: '/m/reports?doc=masters', label: 'Masters', permission: 'reports.view', feature: 'reports', ready: true },
+      { id: 'report-sales', href: '/m/reports?doc=sales', label: 'Sales', permission: 'reports.view', feature: 'reports', ready: true },
+      { id: 'report-purchase', href: '/m/reports?doc=purchase', label: 'Purchase', permission: 'reports.view', feature: 'reports', ready: true },
+      { id: 'report-stock', href: '/m/reports?doc=stock', label: 'Stock Transactions', permission: 'reports.view', feature: 'reports', ready: true },
+      { id: 'report-promos', href: '/m/reports?doc=promotions', label: 'Promotions', permission: 'reports.view', feature: 'reports', ready: true },
     ],
   },
   {
@@ -144,7 +158,7 @@ export const NAV = [
       { id: 'main-category', href: '/settings?section=category', label: 'Main Category Setups', permission: 'settings.view', feature: 'settings', ready: true },
       { id: 'gst-setups', href: '/settings?section=gst', label: 'GST Setups', permission: 'settings.view', feature: 'settings', ready: true },
       { id: 'master-config', href: '/settings?section=master', label: 'Master Configurations', permission: 'settings.view', feature: 'settings', ready: true },
-      { id: 'sales-config', href: '/menu/sales-config', label: 'Sales Configurations', permission: 'settings.view', feature: 'settings', ready: false },
+      { id: 'sales-config', href: '/menu/sales-config', label: 'Sales Configurations', permission: 'settings.view', feature: 'settings', ready: true },
       { id: 'purchase-config', href: '/menu/purchase-config', label: 'Purchase Configurations', permission: 'settings.view', feature: 'settings', ready: true },
       { id: 'transfer-config', href: '/menu/transfer-config', label: 'Transfer Order Config', permission: 'settings.view', feature: 'settings', ready: true },
       { id: 'stock-config', href: '/menu/stock-config', label: 'Stock Transactions Config', permission: 'settings.view', feature: 'settings', ready: true },
@@ -191,6 +205,7 @@ export function defaultUnits(businessType, companyType) {
   const units = [{ code: 'pcs', name: 'Piece' }, { code: 'box', name: 'Box' }];
   if (businessType === 'bike_service') units.push({ code: 'ltr', name: 'Litre' }, { code: 'ml', name: 'Millilitre' });
   if (['grocery', 'departmental'].includes(companyType)) units.push({ code: 'kg', name: 'Kilogram' }, { code: 'gm', name: 'Gram' }, { code: 'ltr', name: 'Litre' }, { code: 'ml', name: 'Millilitre' }, { code: 'pkt', name: 'Packet' });
+  if (companyType === 'liquor_shop') units.push({ code: 'btl', name: 'Bottle' }, { code: 'case', name: 'Case' }, { code: 'ml', name: 'Millilitre' }, { code: 'ltr', name: 'Litre' });
   if (companyType === 'apparel') units.push({ code: 'set', name: 'Set' }, { code: 'mtr', name: 'Metre' });
   return units;
 }
@@ -201,6 +216,7 @@ const TYPE_CATEGORIES = {
   book_shop: [{ name: 'Books', children: ['School Text Books', 'Competitive Exams', 'Novels'] }, { name: 'Stationery' }, { name: 'Office Supplies' }],
   mobile_store: [{ name: 'Mobiles', children: ['Smartphones', 'Feature Phones'] }, { name: 'Accessories', children: ['Chargers & Cables', 'Covers & Glass', 'Earphones'] }, { name: 'Spare Parts' }],
   electronics: [{ name: 'TV & Audio' }, { name: 'Home Appliances' }, { name: 'Kitchen Appliances' }, { name: 'Computers & Accessories' }],
+  liquor_shop: [{ name: 'Whisky' }, { name: 'Rum' }, { name: 'Brandy' }, { name: 'Vodka' }, { name: 'Gin' }, { name: 'Wine' }, { name: 'Beer' }, { name: 'Country Liquor' }, { name: 'Soft Drinks & Soda' }, { name: 'Snacks' }],
   other: [{ name: 'General' }],
 };
 export function defaultCategories(businessType, companyType) {

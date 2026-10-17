@@ -1,3 +1,4 @@
+import { useActivityTracker } from './activity.js';
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { COPY, NAV, stateName } from '../../shared/domain.mjs';
@@ -54,7 +55,13 @@ function lockedScreen(location, session) {
 function LicenceBadge({ session }) {
   const lic = session.tenant.licence;
   if (!lic) return null;
+  const dd = (v) => new Date(v).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  if (lic.paidExpired) return <div className="lic-badge over" title="Contact SKPOS to renew the licence">Licence expired · now on {lic.packageName}</div>;
   if (lic.expired) return <div className="lic-badge over" title="Contact SKPOS to choose a package">Trial ended · now on {lic.packageName}</div>;
+  // paid licence or an add-on module ending within 15 days
+  const soon = Object.entries(lic.moduleExpiry || {}).map(([k, v]) => [k, Math.ceil((Date.parse(`${v}T23:59:59`) - Date.now()) / 86400000)]).filter(([, d]) => d >= 0 && d <= 15);
+  if (!lic.trial && lic.paidUntil && lic.paidDaysLeft != null && lic.paidDaysLeft <= 15) return <div className="lic-badge low" title={`Licence valid till ${dd(lic.paidUntil)}`}>{lic.packageName} · renew in <b>{lic.paidDaysLeft}</b> day{lic.paidDaysLeft === 1 ? '' : 's'}</div>;
+  if (!lic.trial && soon.length) return <div className="lic-badge low" title={soon.map(([k, d]) => `${k}: ${d} days left`).join(', ')}>{lic.packageName} · add-on ends in <b>{Math.min(...soon.map(([, d]) => d))}</b> days</div>;
   if (lic.trial) {
     const days = lic.daysLeft ?? 0;
     return <div className={days <= 3 ? 'lic-badge low' : 'lic-badge'} title={lic.trialEndsAt ? `Trial ends ${new Date(lic.trialEndsAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : undefined}>{lic.packageName} trial · <b>{days}</b> day{days === 1 ? '' : 's'} left</div>;
@@ -128,7 +135,8 @@ function Leaf({ item, nested, location, onNavigate }) {
 }
 
 export function Shell() {
-  const { session } = useAuth();
+  const { session, request } = useAuth();
+  useActivityTracker(request);
   const location = useLocation();
   const [open, setOpen] = useState(false);
   // Accordion: all groups start collapsed; only one group is open at a time.
@@ -233,7 +241,7 @@ export function Shell() {
               {locked ? (
                 <div className="lic-locked">
                   <h2>{locked.label}</h2>
-                  <p>This screen is not included in your <b>{session.tenant.plan.name}</b> package{session.tenant.licence?.expired ? ' — your 15-day trial has ended' : ''}.</p>
+                  <p>This screen is not included in your <b>{session.tenant.plan.name}</b> package{session.tenant.licence?.paidExpired ? ' — your licence has expired' : session.tenant.licence?.expired ? ' — your 15-day trial has ended' : ''}.</p>
                   <p>Contact SKPOS to upgrade your package: Santosh Katras, Mob. 9975658762.</p>
                 </div>
               ) : <Outlet />}

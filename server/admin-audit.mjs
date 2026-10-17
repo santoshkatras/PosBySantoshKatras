@@ -4,13 +4,14 @@
 // target_name, target_code, summary, changes (JSON [{field,label,group,before,after}]), before_json,
 // after_json (flat field maps), effects (JSON [text]), ip.
 import { FEATURE_KEYS, LOCKED_FEATURES } from '../shared/domain.mjs';
-import { MODULE_LABELS, featureCatalog, licenceOf, verticalModules } from '../shared/licensing.mjs';
+import { MODULE_LABELS, featureCatalog, licenceOf, typeRules } from '../shared/licensing.mjs';
 
 export const AUDIT_TABLE = 'admin_audit_log';
 export const ACTION_LABELS = {
   'company.update': 'Company updated',
   'company.extend': 'Trial extended',
   'packages.update': 'Packages changed',
+  'types.update': 'Company types & features changed',
   'admin.setup': 'Admin account created',
   'admin.login': 'Admin signed in',
   'admin.login_failed': 'Sign-in failed',
@@ -27,19 +28,22 @@ const ovr = (v) => (v === true ? 'Enabled' : v === false ? 'Disabled' : 'Package
 const yes = (v) => (v ? 'Yes' : 'No');
 
 // every field of a company the admin can change, plus the result (licence in use), as display values
-export function companyView(company, packages) {
+export function companyView(company, packages, mapping = null) {
   if (!company) return {};
   const lic = licenceOf(company, packages);
   const name = (code) => packages.find((p) => p.code === code)?.name || code || '—';
   const mo = parse(company.module_overrides, {}) || {};
   const fo = parse(company.feature_overrides, {}) || {};
   const lo = parse(company.limit_overrides, {}) || {};
-  const fits = new Set(verticalModules(company.business_type));
+  const typed = typeRules(company, mapping);
+  const fits = typed.fits;
   const v = {};
   const put = (field, group, label, value) => { v[field] = { group, label, value: value === undefined || value === null || value === '' ? '—' : String(value) }; };
   put('package', 'Licence', 'Package', name(company.package || 'professional'));
   put('license_mode', 'Licence', 'Licence type', company.license_mode === 'trial' ? 'Trial' : 'Active (paid)');
   put('expires_at', 'Licence', 'Trial ends', company.license_mode === 'trial' ? day(company.expires_at) : '— (paid)');
+  put('paid_until', 'Licence', 'Licence valid till', company.license_mode === 'trial' ? '—' : day(company.paid_until) || 'No end date');
+  for (const [k, v] of Object.entries(parse(company.module_expiry, {}) || {})) put(`expiry.${k}`, 'Add-on expiry', MODULE_LABELS[k] || k, v);
   put('status', 'Licence', 'Company status', company.status === 'suspended' ? 'Disabled (cannot sign in)' : 'Enabled');
   put('limit.locations', 'Limits', 'Locations limit', Number(lo.locations) > 0 ? lo.locations : 'Package default');
   put('limit.users', 'Limits', 'Users limit', Number(lo.users) > 0 ? lo.users : 'Package default');
@@ -56,7 +60,8 @@ export function companyView(company, packages) {
   }
   for (const f of featureCatalog()) {
     const modOn = !f.module || LOCKED_FEATURES.includes(f.module) || (typeof mo[f.module] === 'boolean' ? mo[f.module] : lic.modules[f.module] && fits.has(f.module));
-    put(`result.feature.${f.id}`, 'Result', `Screen · ${f.group} › ${f.label}`, lic.features[f.id] && modOn ? 'On' : 'Off');
+    const typeOk = !typed.hidden.has(f.id) || fo[f.id] === true;
+    put(`result.feature.${f.id}`, 'Result', `Screen · ${f.group} › ${f.label}`, lic.features[f.id] && modOn && typeOk ? 'On' : 'Off');
   }
   return v;
 }

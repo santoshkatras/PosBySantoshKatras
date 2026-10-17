@@ -18,3 +18,20 @@
 .sc-result dt{color:#667085}
 .sc-result dd{margin:0;color:#101828;font-weight:600}
 @media (max-width:640px){.sc-flow em{display:none}}
+/* Sales Configurations */
+.scf-tabs{display:flex;gap:6px;margin:0 0 10px}
+.scf-tabs button{border:1px solid #d0d5dd;background:#fff;border-radius:9px;padding:7px 16px;font-weight:600;color:#344054;cursor:pointer}
+.scf-tabs button.on{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+.scf-pct{display:flex;flex-direction:column;gap:4px;margin:10px 0 4px;max-width:420px}
+.scf-pct b{font-size:13.5px;color:#101828}
+.scf-pct span{display:inline-flex;align-items:center;gap:6px}
+.scf-pct input{width:110px;height:34px;border:1px solid #d0d5dd;border-radius:8px;padding:0 10px;text-align:right}
+.scf-pct small{color:#667085;font-size:12px}
+.scf-row{display:flex;align-items:center;gap:10px;margin:6px 0}
+.scf-row>span{width:52px;font-weight:600;color:#475467;font-size:13px}
+.scf-modes{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.scf-modes label{display:flex;gap:8px;align-items:flex-start;border:1px solid #eaecf0;border-radius:10px;padding:10px;cursor:pointer;background:#fff}
+.scf-modes label.on{border-color:#1d4ed8;background:#eff4ff}
+.scf-modes label span{display:flex;flex-direction:column;gap:2px}
+.scf-modes label b{font-size:13.5px}
+.scf-modes label small{font-size:12px;color:#667085}

@@ -169,10 +169,120 @@ export async function seedDemos(store) {
     await openStock(store, shop.companyId, parts.id, pads[0].id, 12);
     await openStock(store, shop.companyId, parts.id, filter[0].id, 3);
   }
+
+  // Liquor / Wine Shop & Bar demo: FL-II wine shop + FL-III permit room, excise items, licences and dry days
+  const third = await store.find('users', {});
+  if (!third.some((row) => row.email === 'owner@wines.demo')) {
+    const shop = await provisionTenant(store, {
+      licenseMode: 'active',
+      ownerName: 'Santosh Patil',
+      email: 'owner@wines.demo',
+      mobile: '9822000000',
+      password: PASSWORD,
+      businessName: 'Vambori Wines',
+      legalName: 'Vambori Wines',
+      businessType: 'computer_shop',
+      companyType: 'liquor_shop',
+      gstin: '',
+      stateCode: '27',
+      locationName: 'Vambori Wine Shop',
+    });
+    const bar = await store.insert('locations', { company_id: shop.companyId, name: 'Sagar Permit Room (Bar)', kind: 'store', is_active: 1 });
+    await addUser(store, shop.companyId, 'sales', 'Ganesh Shinde', 'counter@wines.demo', shop.locationId);
+    const units = await store.find('units', { company_id: shop.companyId });
+    const bottle = (units.find((u) => u.code === 'btl') || units[0]).id;
+    const brandIds = new Map();
+    const brandOf = async (name) => { if (!brandIds.has(name)) brandIds.set(name, (await store.insert('brands', { company_id: shop.companyId, name })).id); return brandIds.get(name); };
+    // [name, brand, category (Item Type), liquor category, hsn, size ml, MRP, case pack, strength, shop stock, bar stock, peg 30 ml rate]
+    const LIST = [
+      ['Royal Stag Whisky', 'Royal Stag', 'Whisky', 'whisky', '22083011', 180, 260, 48, 42.8, 96, 0, 0],
+      ['Royal Stag Whisky', 'Royal Stag', 'Whisky', 'whisky', '22083011', 375, 520, 24, 42.8, 48, 0, 0],
+      ['Royal Stag Whisky', 'Royal Stag', 'Whisky', 'whisky', '22083011', 750, 1040, 12, 42.8, 36, 6, 70],
+      ['Imperial Blue Whisky', 'Imperial Blue', 'Whisky', 'whisky', '22083011', 180, 230, 48, 42.8, 72, 0, 0],
+      ['Imperial Blue Whisky', 'Imperial Blue', 'Whisky', 'whisky', '22083011', 750, 920, 12, 42.8, 24, 6, 60],
+      ['Blenders Pride Whisky', 'Blenders Pride', 'Whisky', 'whisky', '22083011', 750, 1500, 12, 42.8, 18, 4, 110],
+      ['Old Monk Rum', 'Old Monk', 'Rum', 'rum', '22084011', 180, 200, 48, 42.8, 48, 0, 0],
+      ['Old Monk Rum', 'Old Monk', 'Rum', 'rum', '22084011', 750, 780, 12, 42.8, 24, 4, 55],
+      ['Magic Moments Vodka', 'Magic Moments', 'Vodka', 'vodka', '22086000', 750, 980, 12, 37.5, 12, 3, 70],
+      ['Mansion House Brandy', 'Mansion House', 'Brandy', 'brandy', '22082011', 180, 230, 48, 42.8, 48, 0, 0],
+      ['Kingfisher Strong Beer', 'Kingfisher', 'Beer', 'beer_strong', '22030000', 650, 190, 12, 8, 120, 24, 0],
+      ['Kingfisher Premium Beer', 'Kingfisher', 'Beer', 'beer_mild', '22030000', 650, 180, 12, 4.8, 60, 12, 0],
+      ['Budweiser Beer Can', 'Budweiser', 'Beer', 'beer_mild', '22030000', 500, 200, 24, 5, 48, 0, 0],
+      ['Sula Shiraz Cabernet Red Wine', 'Sula', 'Wine', 'wine', '22042190', 750, 850, 12, 13, 12, 2, 0],
+    ];
+    for (const [i, [name, brand, cat, lcat, hsn, size, mrp, pack, strength, shopQty, barQty, peg]] of LIST.entries()) {
+      const [variant] = await addProduct(store, shop.companyId, {
+        name: `${name} ${size} ML`, brandId: await brandOf(brand), categoryId: await categoryId(store, shop.companyId, cat), unitId: bottle, hsn, gst: '0',
+        variants: [{ sku: `LQ${String(i + 1).padStart(3, '0')}`, mrp: `${mrp}.00`, sale: `${mrp}.00`, cost: (Math.round(mrp * 0.82)).toFixed(2), min: String(Math.max(Math.round(pack / 2), 3)) }],
+      });
+      await store.insert('liquor_items', { company_id: shop.companyId, variant_id: variant.id, category: lcat, size_ml: String(size), case_qty: String(pack), strength: String(strength), excise_code: '', peg_rates: JSON.stringify(peg ? { 30: peg, 60: peg * 2 - 10, 90: peg * 3 - 20 } : {}), active: '1', updated_at: new Date().toISOString() });
+      await openStock(store, shop.companyId, shop.locationId, variant.id, shopQty);
+      if (barQty) await openStock(store, shop.companyId, bar.id, variant.id, barQty);
+    }
+    const year = new Date().getFullYear();
+    await store.insert('settings', {
+      company_id: shop.companyId, setting_key: 'liquor_config',
+      setting_value: JSON.stringify({
+        licences: [
+          { id: 'lic-fl2', type: 'FL-II', number: 'FL-II/AHM/0421', holder: 'Santosh Patil', locationId: shop.locationId, validFrom: `${year}-04-01`, validTo: `${year + 1}-03-31`, office: 'Superintendent of State Excise, Ahilyanagar', fee: '', notes: '' },
+          { id: 'lic-fl3', type: 'FL-III', number: 'FL-III/AHM/1187', holder: 'Santosh Patil', locationId: bar.id, validFrom: `${year}-04-01`, validTo: `${year + 1}-03-31`, office: 'Superintendent of State Excise, Ahilyanagar', fee: '', notes: '' },
+        ],
+        rules: {},
+        dryDays: [[`${year}-01-26`, 'Republic Day'], [`${year}-05-01`, 'Maharashtra Day'], [`${year}-08-15`, 'Independence Day'], [`${year}-10-02`, 'Gandhi Jayanti'], [`${year + 1}-01-26`, 'Republic Day'], [`${year + 1}-05-01`, 'Maharashtra Day']].map(([date, reason]) => ({ date, reason, locationIds: [] })),
+      }),
+    });
+  }
+
+  // Goa liquor demo: packed-bottle shop + bar, Goa VAT (22% / 5%), suppliers in Goa and Maharashtra (CST against Form C)
+  const fourth = await store.find('users', {});
+  if (!fourth.some((row) => row.email === 'owner@goawines.demo')) {
+    const shop = await provisionTenant(store, {
+      licenseMode: 'active', ownerName: 'Anthony Fernandes', email: 'owner@goawines.demo', mobile: '9822100000', password: PASSWORD,
+      businessName: 'Panaji Wine Store', legalName: 'Panaji Wine Store', businessType: 'computer_shop', companyType: 'liquor_shop', gstin: '', stateCode: '30', locationName: 'Panaji Wine Store',
+    });
+    const bar = await store.insert('locations', { company_id: shop.companyId, name: 'Calangute Bar & Restaurant', kind: 'store', is_active: 1 });
+    const units = await store.find('units', { company_id: shop.companyId });
+    const bottle = (units.find((u) => u.code === 'btl') || units[0]).id;
+    const brandIds = new Map();
+    const brandOf = async (name) => { if (!brandIds.has(name)) brandIds.set(name, (await store.insert('brands', { company_id: shop.companyId, name })).id); return brandIds.get(name); };
+    const LIST = [
+      ['Royal Stag Whisky', 'Royal Stag', 'Whisky', 'whisky', '22083011', 750, 650, 12, 42.8, 36, 6, 60],
+      ['Old Monk Rum', 'Old Monk', 'Rum', 'rum', '22084011', 750, 450, 12, 42.8, 24, 4, 45],
+      ['Magic Moments Vodka', 'Magic Moments', 'Vodka', 'vodka', '22086000', 750, 600, 12, 37.5, 12, 3, 60],
+      ['Kingfisher Strong Beer', 'Kingfisher', 'Beer', 'beer_strong', '22030000', 650, 130, 12, 8, 120, 24, 0],
+      ['Cashew Feni', 'Big Boss', 'Country Liquor', 'country', '22089091', 750, 300, 12, 42.8, 24, 4, 40],
+      ['Big Banyan Red Wine', 'Big Banyan', 'Wine', 'wine', '22042190', 750, 900, 12, 13, 12, 2, 0],
+    ];
+    for (const [i, [name, brand, cat, lcat, hsn, size, mrp, pack, strength, shopQty, barQty, peg]] of LIST.entries()) {
+      const [variant] = await addProduct(store, shop.companyId, {
+        name: `${name} ${size} ML`, brandId: await brandOf(brand), categoryId: await categoryId(store, shop.companyId, cat), unitId: bottle, hsn, gst: '0',
+        variants: [{ sku: `GL${String(i + 1).padStart(3, '0')}`, mrp: `${mrp}.00`, sale: `${mrp}.00`, cost: (Math.round(mrp * 0.7)).toFixed(2), min: String(Math.max(Math.round(pack / 2), 3)) }],
+      });
+      await store.insert('liquor_items', { company_id: shop.companyId, variant_id: variant.id, category: lcat, size_ml: String(size), case_qty: String(pack), strength: String(strength), excise_code: '', peg_rates: JSON.stringify(peg ? { 30: peg, 60: peg * 2 - 10 } : {}), active: '1', updated_at: new Date().toISOString() });
+      await openStock(store, shop.companyId, shop.locationId, variant.id, shopQty);
+      if (barQty) await openStock(store, shop.companyId, bar.id, variant.id, barQty);
+    }
+    const now = new Date().toISOString();
+    await store.insert('suppliers', { company_id: shop.companyId, code: 'SUPP-0001', name: 'Goa Liquor Distributors (Margao)', mobile: '9890000001', email: '', gstin: '', address: 'Margao, Salcete', city: 'Margao', state_code: '30', notes: 'Goa wholesaler — input VAT', created_at: now });
+    await store.insert('suppliers', { company_id: shop.companyId, code: 'SUPP-0002', name: 'Kolhapur Spirits Pvt Ltd', mobile: '9890000002', email: '', gstin: '', address: 'MIDC Shiroli', city: 'Kolhapur', state_code: '27', notes: 'Maharashtra supplier — CST against Form C', created_at: now });
+    const year = new Date().getFullYear();
+    await store.insert('settings', {
+      company_id: shop.companyId, setting_key: 'liquor_config',
+      setting_value: JSON.stringify({
+        licences: [
+          { id: 'lic-rb', type: 'GOA-RB', number: 'EXC/TIS/RB/2231', holder: 'Anthony Fernandes', locationId: shop.locationId, validFrom: `${year}-04-01`, validTo: `${year + 1}-03-31`, office: 'Excise Inspector, Tiswadi', fee: '', notes: '' },
+          { id: 'lic-rc', type: 'GOA-RC', number: 'EXC/BAR/RC/0877', holder: 'Anthony Fernandes', locationId: bar.id, validFrom: `${year}-04-01`, validTo: `${year + 1}-03-31`, office: 'Excise Inspector, Bardez', fee: '', notes: '' },
+        ],
+        rules: {},
+        tax: { tin: '30000000000', cstNo: 'GOA/CST/0000' },
+        dryDays: [[`${year}-01-26`, 'Republic Day'], [`${year}-08-15`, 'Independence Day'], [`${year}-10-02`, 'Gandhi Jayanti'], [`${year + 1}-01-26`, 'Republic Day']].map(([date, reason]) => ({ date, reason, locationIds: [] })),
+      }),
+    });
+  }
 }
 
 if (process.argv[1] && process.argv[1].endsWith('seed.mjs')) {
   const store = await openStore();
   await seedDemos(store);
-  console.log('Seed complete. Computer shop: owner@bytebazaar.demo / Demo@12345. Bike service: owner@spoke.demo / Demo@12345.');
+  console.log('Seed complete. Computer shop: owner@bytebazaar.demo / Demo@12345. Bike service: owner@spoke.demo / Demo@12345. Liquor shop: owner@wines.demo / Demo@12345. Goa liquor: owner@goawines.demo / Demo@12345.');
 }

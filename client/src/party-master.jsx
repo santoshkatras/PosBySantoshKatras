@@ -1,3 +1,4 @@
+import { focusNext } from './keyboard.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { STATES } from '../../shared/domain.mjs';
@@ -578,7 +579,7 @@ function PartyMaster({ kind, editId, onClose }) {
                     placeholder={gstOff ? 'Not needed for unregistered' : '15-character GSTIN, press Enter'}
                     value={draft.gstin}
                     onChange={(event) => { const gstin = event.target.value.toUpperCase().replace(/[^0-9A-Z]/g, ''); set({ gstin }); if (gstState.status !== 'idle') setGstState({ status: 'idle', message: '', matches: [] }); }}
-                    onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); fetchGstin(); } }}
+                    onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); fetchGstin(); focusNext(event.currentTarget, event.shiftKey); } }}
                     onBlur={() => { if (draft.gstin.length === 15 && gstState.status === 'idle') fetchGstin(); }}
                   />
                   <button type="button" aria-label="Search GSTIN" title="Search GSTIN (Enter)" disabled={gstOff || gstState.status === 'loading'} onClick={fetchGstin}>
@@ -620,7 +621,7 @@ function PartyMaster({ kind, editId, onClose }) {
                       if (pin.length === 6 && pin !== lastPin.current) fetchPincode(pin);
                       if (pin.length < 6) { setPinState({ status: 'idle', message: '' }); setAreas([]); lastPin.current = ''; }
                     }}
-                    onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); fetchPincode(draft.pincode, draft.area); } }}
+                    onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); fetchPincode(draft.pincode, draft.area); focusNext(event.currentTarget, event.shiftKey); } }}
                   />
                   <button type="button" aria-label="Find areas for pincode" title="Find areas" disabled={pinState.status === 'loading'} onClick={() => fetchPincode(draft.pincode, draft.area)}>
                     {pinState.status === 'loading' ? <span className="im-spin" /> : <SearchIcon />}
@@ -661,7 +662,7 @@ function PartyMaster({ kind, editId, onClose }) {
                     placeholder="Type account number, press Enter to search"
                     value={draft.bank.accountNumber}
                     onChange={(event) => { setBank({ accountNumber: event.target.value.replace(/\D/g, '') }); if (acctState.status !== 'idle' || acctState.message) setAcctState({ status: 'idle', message: '' }); }}
-                    onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); fetchAccount(); } }}
+                    onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); fetchAccount(); focusNext(event.currentTarget, event.shiftKey); } }}
                     onBlur={() => { if (draft.bank.accountNumber.length >= 6 && !acctState.message && !draft.bank.ifsc) fetchAccount(); }}
                   />
                   <button type="button" aria-label="Search account number" title="Search account number (Enter)" disabled={acctState.status === 'loading'} onClick={fetchAccount}>
@@ -688,7 +689,7 @@ function PartyMaster({ kind, editId, onClose }) {
                       if (ifsc.length === 11 && ifsc !== lastIfsc.current) fetchIfsc(ifsc);
                       if (ifsc.length < 11) { setIfscState({ status: 'idle', message: '' }); lastIfsc.current = ''; }
                     }}
-                    onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); fetchIfsc(draft.bank.ifsc); } }}
+                    onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); fetchIfsc(draft.bank.ifsc); focusNext(event.currentTarget, event.shiftKey); } }}
                   />
                   <button type="button" aria-label="Fetch bank from IFSC" title="Fetch bank and branch" disabled={ifscState.status === 'loading'} onClick={() => fetchIfsc(draft.bank.ifsc)}>
                     {ifscState.status === 'loading' ? <span className="im-spin" /> : <SearchIcon />}

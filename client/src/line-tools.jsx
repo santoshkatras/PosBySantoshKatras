@@ -239,6 +239,25 @@ export function LotPicker({ variantId, locationId, qty, value = [], onChange, on
     onChange(ordered);
     onQty?.(lotTotal(ordered));
   }
+  // Space ticks / unticks a barcode (takes what is still needed, else the whole barcode) · ↑ ↓ / Enter move between barcodes
+  function lotKey(e, lot) {
+    const go = (step) => { const all = [...e.currentTarget.closest('tbody').querySelectorAll('td.lt-outq input')]; const next = all[all.indexOf(e.currentTarget) + step]; if (next) { e.preventDefault(); next.focus(); next.select(); return true; } return false; };
+    if (e.key === ' ') {
+      e.preventDefault();
+      if (num(picked(lot.barcode)) > 0) { setLot(lot.barcode, ''); return; }
+      const need = num(qty) > 0 ? r3(num(qty) - lotTotal(value)) : 0;
+      setLot(lot.barcode, String(need > 0 ? Math.min(need, lot.qty) : lot.qty));
+    } else if (e.key === 'ArrowDown') go(1);
+    else if (e.key === 'ArrowUp') go(-1);
+    else if (e.key === 'Enter' && !e.shiftKey) {
+      // still short of the quantity → go to the next barcode; complete → Enter adds the line as before
+      const need = num(qty) > 0 ? r3(num(qty) - lotTotal(value)) : 0;
+      if (need > 0.0005 && go(1)) { e.stopPropagation(); return; }
+      e.preventDefault();
+      const el = e.currentTarget;
+      setTimeout(() => el.closest('.ose-pop, [role=dialog]')?.querySelector('footer .btn.primary:not(:disabled)')?.click(), 0);
+    }
+  }
   const today = new Date();
   const shownCols = LOT_COLUMNS.filter(([id]) => cols.on(id) && (batchItem || !BATCH_ONLY.includes(id)));
   const q = find.trim().toUpperCase();
@@ -264,7 +283,7 @@ export function LotPicker({ variantId, locationId, qty, value = [], onChange, on
       </div>
       <div className="lt-stock-table">
         <table>
-          <thead><tr><th className="num lt-outq">Out qty</th>{shownCols.map(([id, label]) => <th key={id} className={TEXT_COLS.includes(id) ? '' : 'num'}>{label}</th>)}</tr></thead>
+          <thead><tr><th className="num lt-outq" title="Type the qty, or press Space to tick / untick a barcode · ↑ ↓ move">Out qty</th>{shownCols.map(([id, label]) => <th key={id} className={TEXT_COLS.includes(id) ? '' : 'num'}>{label}</th>)}</tr></thead>
           <tbody>
             {rows.map((lot, index) => {
               const age = ageOf(lot.receivedAt);
@@ -279,7 +298,7 @@ export function LotPicker({ variantId, locationId, qty, value = [], onChange, on
               const cls = [on ? 'lt-picked' : '', lot.barcode === highlight ? 'lt-hl' : '', left != null && left < 0 ? 'lt-expired' : left != null && left <= 30 ? 'lt-near' : ''].filter(Boolean).join(' ');
               return (
                 <tr key={lot.barcode} className={cls || undefined}>
-                  <td className="num lt-outq"><input ref={index === 0 ? first : undefined} inputMode="decimal" aria-label={`Out qty from ${lot.barcode}`} value={picked(lot.barcode)} placeholder="0" onChange={(e) => setLot(lot.barcode, e.target.value.replace(/[^\d.]/g, ''))} onFocus={(e) => e.target.select()} /></td>
+                  <td className="num lt-outq"><input ref={index === 0 ? first : undefined} inputMode="decimal" aria-label={`Out qty from ${lot.barcode}`} value={picked(lot.barcode)} placeholder="0" onChange={(e) => setLot(lot.barcode, e.target.value.replace(/[^\d.]/g, ''))} onFocus={(e) => e.target.select()} onKeyDown={(e) => lotKey(e, lot)} /></td>
                   {shownCols.map(([id]) => <td key={id} className={TEXT_COLS.includes(id) ? '' : 'num'}>{cell[id]}</td>)}
                 </tr>
               );

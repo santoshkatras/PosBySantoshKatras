@@ -96,6 +96,7 @@ export function ShortcutSettingsPage() {
         <div>
           <h1>Shortcut Key Configurations</h1>
           <p>Keyboard shortcuts for every form. Click a key to record a new one. Form keys work only while that form is open; “Anywhere” keys work on every screen. Press <kbd>Ctrl</kbd> + <kbd>/</kbd> anytime to see the list.</p>
+          <EnterMovesToggle />
         </div>
         <div className="cfg-actions">
           {dirty ? <span className="cfg-dirty">Unsaved changes</span> : null}
@@ -148,5 +149,16 @@ export function ShortcutSettingsPage() {
       {!shown.length ? <p className="cfg-empty">No shortcut matches “{query}”.</p> : null}
       <p className="cfg-note">{SHORTCUT_ACTIONS.length} actions across {SHORTCUT_GROUPS.length} form groups. Enter confirms and Esc cancels in every pop-up; these two keys cannot be changed.</p>
     </div>
+  );
+}
+
+// This computer only: Enter moves to the next field (desktop style) — see keyboard.js
+function EnterMovesToggle() {
+  const [on, setOn] = useState(() => { try { return localStorage.getItem('skpos_enter_moves') !== '0'; } catch { return true; } });
+  return (
+    <label className="sk-enter" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 6, fontWeight: 600, fontSize: 13 }}>
+      <input type="checkbox" checked={on} onChange={(e) => { setOn(e.target.checked); try { localStorage.setItem('skpos_enter_moves', e.target.checked ? '1' : '0'); } catch { /* ignore */ } }} />
+      <kbd>Enter</kbd> moves to the next field in every form (<kbd>Shift</kbd>+<kbd>Enter</kbd> goes back) · <kbd>Space</kbd> ticks rows in pick lists — this computer
+    </label>
   );
 }

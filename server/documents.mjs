@@ -10,6 +10,7 @@ import { isStockBarcode } from '../shared/stock-barcode.mjs';
 import { migrationOf } from './migration-key.mjs';
 import { mergeSelling, sellingPrice } from '../shared/selling-rate.mjs';
 import { readTenders } from './app-settings.mjs';
+import { normalizeSalesConfig, salesRules } from '../shared/sales-config.mjs';
 
 const FORMULA_KEY = 'purchase_formulas';
 
@@ -67,14 +68,14 @@ export function shapeDocument(row, locations = []) {
     payments: data.payments || [],
     change: n(data.change),
     promotions: data.promotions || null,
-    returnCredit: data.returnCredit || null, returns: data.returns || [], reason: data.reason || '', mode: data.mode || '', credit: data.credit || null, refund: data.refund || null, register: data.register || null,
+    returnCredit: data.returnCredit || null, returns: data.returns || [], reason: data.reason || '', mode: data.mode || '', credit: data.credit || null, refund: data.refund || null, register: data.register || null, liquor: data.liquor || null,
     userName: row.user_name || '',
     createdAt: row.created_at,
   };
 }
 
 export function registerDocuments(app, store, deps) {
-  const { auth, allow, route, fail, locationAllowed, scopedLocations, pickerItems, changeStock, receiveSerials, stockLocation, money, qty, on, expiryOf, addBatches, consumeBatches, promotions, lots, org, fillBatchNos, childTarget, unitResolver } = deps;
+  const { auth, allow, route, fail, locationAllowed, scopedLocations, pickerItems, changeStock, receiveSerials, stockLocation, money, qty, on, expiryOf, addBatches, consumeBatches, promotions, lots, org, fillBatchNos, childTarget, unitResolver, liquor, accounts } = deps;
 
   const moduleOf = (req, res) => {
     const module = req.params.module;
@@ -128,6 +129,7 @@ export function registerDocuments(app, store, deps) {
       companyState: req.session.tenant.stateCode || '',
       today: localDay(),
       formulas: module === 'purchase' ? await readFormulas(req.companyId) : null,
+      salesRules: module === 'sales' ? salesRules(await readSalesConfig(req.companyId), type) : null,
       selling: module === 'purchase' ? await readSelling(req.companyId) : null,
     });
   }));
@@ -336,6 +338,13 @@ export function registerDocuments(app, store, deps) {
     const inclusive = Boolean(body.inclusive);
     const companyState = req.session.tenant.stateCode || '';
     const interState = Boolean(party?.stateCode && companyState && party.stateCode !== companyState);
+    // Liquor Shop: dry day, shop hours, licence, age, permit number, strict MRP on bills; Transport Pass on purchases
+    let liquorInfo = null;
+    if (liquor && !mig) {
+      const check = await liquor.checkDocument(req, { module, type, dir, lines, date, location, body, variants, products, inclusive, party, interState });
+      if (check.error) return fail(res, 400, 'LIQUOR', check.error);
+      liquorInfo = check.info || null;
+    }
     // Sales Bill: offers + coupon on the lines, then the payment (tenders, vouchers, points)
     const isBill = module === 'sales' && type === 'bill' && Boolean(promotions) && !mig;
     let prepared = null;
@@ -344,6 +353,31 @@ export function registerDocuments(app, store, deps) {
       if (prepared.error) return fail(res, 400, 'INVALID', prepared.error);
     }
     const totals = docTotals(lines, dir, { inclusive, interState });
+    // Liquor: CST / VAT charged by the supplier on liquor (outside GST) is added to the purchase invoice total
+    if (liquorInfo?.tax?.added) {
+      const exact = Math.round((totals.grand - totals.roundOff + liquorInfo.tax.added) * 100) / 100;
+      totals.liquorTax = { kind: liquorInfo.tax.kind, form: liquorInfo.tax.form, rate: liquorInfo.tax.rate, amount: liquorInfo.tax.added };
+      totals.grand = Math.round(exact);
+      totals.roundOff = Math.round((totals.grand - exact) * 100) / 100;
+    }
+    // Sales Configurations: customer mandatory, max discount %, Sales Order advance
+    const rules = module === 'sales' && !mig ? salesRules(await readSalesConfig(req.companyId), type) : null;
+    if (rules) {
+      const label = meta.label;
+      if (rules.customer === 'mandatory' && !party?.id) return fail(res, 400, 'INVALID', `Choose a saved customer — a customer is mandatory for ${label} (Sales Configurations).`);
+      const maxDisc = n(rules.maxDiscPct);
+      if (maxDisc > 0) {
+        for (const line of lines) for (const row of line.variants || []) if (n(row.qty) > 0 && discOf(line, row) > maxDisc + 0.0001) return fail(res, 400, 'INVALID', `${line.name}: discount ${discOf(line, row)}% is above the allowed ${maxDisc}% (Sales Configurations).`);
+        for (const line of lines) if (line.kind === 'serial' && n(line.disc) > maxDisc + 0.0001) return fail(res, 400, 'INVALID', `${line.name}: discount ${n(line.disc)}% is above the allowed ${maxDisc}% (Sales Configurations).`);
+      }
+      if (type === 'order' && rules.advance === 'mandatory') {
+        const adv = n(body.advance?.amount);
+        if (!(adv > 0)) return fail(res, 400, 'INVALID', 'An advance is mandatory for a Sales Order (Sales Configurations). Enter the advance amount.');
+        const min = n(rules.minAdvancePct) ? Math.ceil(totals.grand * n(rules.minAdvancePct)) / 100 : 0;
+        if (adv + 0.004 < min) return fail(res, 400, 'INVALID', `The advance must be at least ${rules.minAdvancePct}% of the order (₹${min.toFixed(2)}).`);
+      }
+      if (type === 'order' && rules.advance === 'off' && n(body.advance?.amount) > 0) return fail(res, 400, 'INVALID', 'Sales Order advance is switched off in Sales Configurations.');
+    }
     // Exchange: credit from a Sales Return pays (part of) this bill; any extra credit is refunded in cash.
     let credit = null;
     if (isBill && body.returnCredit) {
@@ -355,9 +389,25 @@ export function registerDocuments(app, store, deps) {
       const use = Math.min(balance, totals.grand);
       credit = { number: sr.number, id: sr.id, amount: use, cashBack: Math.round((balance - use) * 100) / 100 };
     }
+    // Advance: money the customer paid earlier (Sales Order advance / extra paid) used on this bill
+    let advance = null;
+    const advOrder = source?.doc_type === 'order' ? source.number : clean(body.advanceOrder, 30).toUpperCase();
+    if (isBill && accounts && n(body.useAdvance) > 0) {
+      if (!party?.id) return fail(res, 400, 'INVALID', 'Choose the saved customer to use the advance.');
+      const av = await accounts.advanceFor(req, party.id, advOrder);
+      const use = Math.round(Math.min(n(body.useAdvance), av.total, totals.grand - (credit?.amount || 0)) * 100) / 100;
+      if (use > 0) advance = { amount: use, orderNumber: advOrder };
+    }
+    // Sales Order advance / Purchase invoice "paid now" — checked before saving
+    const advIn = module === 'sales' && type === 'order' && !mig && n(body.advance?.amount) > 0 ? body.advance : null;
+    const paidNow = module === 'purchase' && type === 'invoice' && !mig && n(body.paidNow?.amount) > 0 ? body.paidNow : null;
+    if ((advIn || paidNow) && !accounts) return fail(res, 400, 'INVALID', 'Payments are not available.');
+    if (advIn && !party?.id) return fail(res, 400, 'INVALID', 'Choose a saved customer to take an advance.');
+    if (paidNow && !party?.id) return fail(res, 400, 'INVALID', 'Choose a saved supplier to record the payment.');
+    if (paidNow && n(paidNow.amount) > totals.grand + 0.004) return fail(res, 400, 'INVALID', `Paid now cannot be more than the invoice total ${totals.grand.toFixed(2)}.`);
     let pay = null;
     if (isBill) {
-      pay = await promotions.checkPayments(req, { grand: Math.round((totals.grand - (credit?.amount || 0)) * 100) / 100, payments: body.payments, party, location, ctx: prepared.ctx });
+      pay = await promotions.checkPayments(req, { grand: Math.round((totals.grand - (credit?.amount || 0) - (advance?.amount || 0)) * 100) / 100, payments: body.payments, party, location, ctx: prepared.ctx });
       if (pay.error) return fail(res, 400, 'INVALID', pay.error);
     }
     // cost of goods for profit on sales
@@ -387,8 +437,9 @@ export function registerDocuments(app, store, deps) {
       status: meta.status, source_number: source?.number || '', total: money(totals.grand),
       data: JSON.stringify({
         party: party || { name: partyName }, sourceType: source?.doc_type || '', refNo: clean(body.refNo, 60), dueDate: isDay(body.dueDate) ? body.dueDate : '',
-        note: clean(body.note, 300), inclusive, interState, stockDir: dir, lines, totals, cost: Math.round(cost * 100) / 100, ...(register ? { register } : {}),
+        note: clean(body.note, 300), inclusive, interState, stockDir: dir, lines, totals, cost: Math.round(cost * 100) / 100, ...(register ? { register } : {}), ...(liquorInfo ? { liquor: liquorInfo } : {}),
         ...(credit ? { returnCredit: { number: credit.number, amount: credit.amount, cashBack: credit.cashBack } } : {}),
+        ...(advance ? { advanceUsed: { amount: advance.amount, orderNumber: advance.orderNumber } } : {}),
         ...(mig ? { migrated: { at: new Date().toISOString(), from: clean(mig.from, 40), history: Boolean(mig.history) }, ...(migPayments ? { payments: migPayments, change: 0 } : {}) } : {}),
         formula: (() => { const used = lines.find((line) => line.fx)?.fx?.formulaId; const found = used && formulaConfig?.formulas.find((item) => item.id === used); return found ? { id: found.id, code: found.code, name: found.name } : null; })(),
       }),
@@ -501,8 +552,16 @@ export function registerDocuments(app, store, deps) {
       srData.credit = { ...srData.credit, used: Math.round((n(srData.credit.used) + credit.amount + credit.cashBack) * 100) / 100, bills: [...(srData.credit.bills || []), { number, amount: credit.amount, cashBack: credit.cashBack, at: now }] };
       await store.update('documents', sr.id, { status: 'Exchanged', data: JSON.stringify(srData) });
     }
+    let advanceTxn = null;
+    if (advance) {
+      const used = await accounts.useAdvance(req, { partyId: party.id, billNumber: number, amount: advance.amount, orderNumber: advance.orderNumber });
+      const fresh = parse((await store.find('documents', { id: saved.id }))[0]);
+      await store.update('documents', saved.id, { data: JSON.stringify({ ...fresh, advanceUsed: { ...fresh.advanceUsed, receipts: used.receipts } }) });
+    }
+    if (advIn) advanceTxn = (await accounts.receiveNow(req, { kind: 'customer', partyId: party.id, amount: n(advIn.amount), tenderId: advIn.tenderId, ref: advIn.ref, orderNumber: number, locationId: location.id, source: '' })).txn || null;
+    if (paidNow) advanceTxn = (await accounts.receiveNow(req, { kind: 'supplier', partyId: party.id, amount: n(paidNow.amount), tenderId: paidNow.tenderId, ref: paidNow.ref, billNumber: number, locationId: location.id, source: '' })).txn || null;
     await store.insert('audit_logs', { company_id: req.companyId, user_id: req.session.user.id, action: `${module}.${type}.create`, entity: 'document', entity_id: number, created_at: now });
-    res.status(201).json({ id: saved.id, number, total: totals.grand, stockDir: dir, lines: lines.length, change: pay?.change || 0, promotions: promoSummary, returnCredit: credit ? { number: credit.number, amount: credit.amount, cashBack: credit.cashBack } : null });
+    res.status(201).json({ id: saved.id, number, total: totals.grand, stockDir: dir, lines: lines.length, change: pay?.change || 0, promotions: promoSummary, returnCredit: credit ? { number: credit.number, amount: credit.amount, cashBack: credit.cashBack } : null, advanceUsed: advance?.amount || 0, receipt: advanceTxn ? { number: advanceTxn.number, amount: advanceTxn.amount } : null });
   }));
 
   // Close the pending balance of a partly converted (or open) document.
@@ -523,6 +582,22 @@ export function registerDocuments(app, store, deps) {
   }));
 
   // ---------- Configuration → Purchase Configurations: formulas and supplier mapping ----------
+  async function readSalesConfig(companyId) {
+    const [row] = await store.find('settings', { company_id: companyId, setting_key: 'sales_config' });
+    try { return normalizeSalesConfig(JSON.parse(row?.setting_value || '{}')); } catch { return normalizeSalesConfig({}); }
+  }
+  app.get('/api/sales-config', auth, allow('sales.view', 'sales'), route(async (req, res) => {
+    res.json({ config: await readSalesConfig(req.companyId), canEdit: req.session.user.permissions.includes('settings.manage') });
+  }));
+  app.put('/api/sales-config', auth, allow('settings.manage', 'settings'), route(async (req, res) => {
+    const config = normalizeSalesConfig(req.body?.config);
+    const [row] = await store.find('settings', { company_id: req.companyId, setting_key: 'sales_config' });
+    if (row) await store.update('settings', row.id, { setting_value: JSON.stringify(config) });
+    else await store.insert('settings', { company_id: req.companyId, setting_key: 'sales_config', setting_value: JSON.stringify(config) });
+    await store.insert('audit_logs', { company_id: req.companyId, user_id: req.session.user.id, action: 'settings.sales_config', entity: 'settings', entity_id: 'sales_config', created_at: new Date().toISOString() });
+    res.json({ config });
+  }));
+
   async function readFormulas(companyId) {
     const [setting] = await store.find('settings', { company_id: companyId, setting_key: FORMULA_KEY });
     let config = {};
@@ -585,7 +660,8 @@ export function registerDocuments(app, store, deps) {
     if (!bill || !locationAllowed(req.session, bill.location_id)) return fail(res, 404, 'NOT_FOUND', `Sales Bill ${billNo} was not found.`);
     const location = await stockLocation(req, body.locationId || bill.location_id);
     if (!location) return fail(res, 400, 'INVALID', 'Choose the location the goods come back to.');
-    const mode = body.mode === 'exchange' ? 'exchange' : 'refund';
+    const mode = ['exchange', 'account'].includes(body.mode) ? body.mode : 'refund';
+    if (mode === 'account' && (!bill.party_id || !accounts)) return fail(res, 400, 'INVALID', 'Credit to account needs a saved customer on the bill.');
     const reason = clean(body.reason, 80) || 'Customer return';
     const avail = returnable(bill);
     const want = [];
@@ -660,16 +736,18 @@ export function registerDocuments(app, store, deps) {
     await store.insert('documents', {
       company_id: req.companyId, module: 'sales', doc_type: 'return', number, doc_date: localDay(),
       party_id: bill.party_id || '', party_name: bill.party_name || '', location_id: location.id, register_id: register?.id || '',
-      status: mode === 'exchange' ? 'Credit Open' : 'Refunded', source_number: bill.number, total: money(amount),
+      status: mode === 'exchange' ? 'Credit Open' : mode === 'account' ? 'Credited to Account' : 'Refunded', source_number: bill.number, total: money(amount),
       data: JSON.stringify({
         party: billData.party || { name: bill.party_name }, sourceType: 'bill', refNo: bill.number, note: clean(body.note, 300), reason, mode, ...(register ? { register } : {}),
         inclusive: false, interState: Boolean(billData.interState), stockDir: 1, lines, totals: { ...totals, grand: amount, roundOff: r2(amount - (totals.taxable + totals.tax)) },
-        ...(mode === 'exchange' ? { credit: { amount, used: 0, bills: [] } } : { refund: { amount, mode: 'cash', at: now } }),
+        ...(mode === 'exchange' ? { credit: { amount, used: 0, bills: [] } } : mode === 'account' ? { account: { amount, at: now } } : { refund: { amount, mode: 'cash', at: now } }),
       }),
       user_name: req.session.user.name || '', created_at: now,
     });
+    let creditNote = null;
+    if (mode === 'account') creditNote = (await accounts.creditNote(req, { partyId: bill.party_id, amount, billNumber: bill.number, returnNumber: number, locationId: location.id })).txn || null;
     await store.insert('audit_logs', { company_id: req.companyId, user_id: req.session.user.id, action: 'sales.return.create', entity: 'document', entity_id: number, created_at: now });
-    res.status(201).json({ number, amount, mode, billNumber: bill.number, partyId: bill.party_id || '', partyName: bill.party_name || '' });
+    res.status(201).json({ number, amount, mode, creditNote: creditNote ? { number: creditNote.number, settled: creditNote.allocated, onAccount: creditNote.unallocated } : null, billNumber: bill.number, partyId: bill.party_id || '', partyName: bill.party_name || '' });
   }));
 
   // ---------- customer / supplier previous history (link under the party field) ----------

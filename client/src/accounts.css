@@ -1,0 +1,62 @@
+.ac-page .grid-toolbar{flex-wrap:nowrap}
+.ac-tabs{display:flex;gap:4px;flex:none}
+.ac-tabs button{border:1px solid #d0d5dd;background:#fff;border-radius:8px;padding:5px 12px;font-weight:600;font-size:13px;color:#344054;cursor:pointer;white-space:nowrap}
+.ac-tabs button.on{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+.ac-tabs button:disabled{opacity:.45;cursor:not-allowed}
+.ac-sum{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid #eaecf0}
+.ac-chip{display:inline-flex;flex-direction:column;padding:4px 12px;border:1px solid #eaecf0;border-radius:10px;background:#f9fafb;min-width:110px}
+.ac-chip small{font-size:11px;color:#667085;white-space:nowrap}
+.ac-chip b{font-size:15px;color:#101828}
+.ac-chip.due b{color:#b42318}.ac-chip.bad{background:#fef3f2;border-color:#fecdca}.ac-chip.bad b{color:#b42318}
+.ac-chip.adv{background:#ecfdf3;border-color:#abefc6}.ac-chip.adv b{color:#067647}
+.ac-keys{margin-left:auto;font-size:12px;color:#667085;white-space:nowrap}
+.ac-keys kbd{border:1px solid #d0d5dd;border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:11px;background:#fff;margin:0 1px}
+.ac-due{color:#b42318}.ac-bad{color:#b42318;font-weight:600}.ac-adv{color:#067647;font-weight:600}
+.ac-table tr.ac-cur td{background:#eff4ff!important;box-shadow:inset 0 1px #c7d7fe,inset 0 -1px #c7d7fe}
+.ac-table tr.ac-cancel td{color:#98a2b3;text-decoration:line-through}
+.ac-table .row-actions{white-space:nowrap}
+.ac-table .row-actions .btn{padding:3px 9px;font-size:12.5px}
+.ac-export{margin-left:auto;padding:3px 10px;font-size:12.5px}
+.ac-pop.ose-pop.wide{width:min(1080px,96vw)}
+.ac-body{display:flex;flex-direction:column;gap:8px}
+.ac-body .ac-sum{border:0;padding:0}
+.ac-form{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;background:#f9fafb;border:1px solid #eaecf0;border-radius:10px;padding:8px 10px}
+.ac-form label{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:600;color:#475467;min-width:120px}
+.ac-form label.grow{flex:1;min-width:160px}
+.ac-form input,.ac-form select{height:32px;border:1px solid #d0d5dd;border-radius:7px;padding:0 8px;font-size:13.5px;background:#fff}
+.ac-form label:first-child input{font-weight:700;font-size:15px;width:130px}
+.ac-form label.ac-check{flex-direction:row;align-items:center;gap:6px;min-width:0;height:32px;white-space:nowrap}
+.ac-form label.ac-check input{height:auto}
+.ac-h{margin:2px 0 0;font-size:13px;color:#344054}
+.ac-scroll{max-height:34vh;overflow:auto;border:1px solid #eaecf0;border-radius:8px}
+.ac-scroll table{width:100%;border-collapse:collapse;font-size:13px}
+.ac-scroll th{position:sticky;top:0;background:#f9fafb;text-align:left;padding:6px 8px;font-size:12px;color:#475467;border-bottom:1px solid #eaecf0;white-space:nowrap}
+.ac-scroll td{padding:5px 8px;border-bottom:1px solid #f2f4f7;vertical-align:top}
+.ac-scroll th.num,.ac-scroll td.num{text-align:right}
+.ac-scroll tbody tr[tabindex="0"]{cursor:pointer}
+.ac-scroll tbody tr[tabindex="0"]:focus{outline:2px solid #2e90fa;outline-offset:-2px}
+.ac-scroll tbody tr.on td{background:#eff8ff}
+.ac-tick{width:30px}
+.ac-allocs span{display:inline-block;margin:0 4px 2px 0;padding:0 6px;border-radius:6px;background:#f2f4f7;font-size:11.5px;white-space:nowrap}
+.ac-allocs span.a{background:#eff8ff;color:#175cd3}.ac-allocs span.r{background:#fef3f2;color:#b42318}
+.ac-f{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#475467}
+.ac-f input,.ac-f select{height:30px;border:1px solid #d0d5dd;border-radius:7px;padding:0 6px}
+/* Sales Order advance / Purchase invoice paid-now / Sales Bill advance chip */
+.ac-inline{display:inline-flex;align-items:center;gap:5px;flex:none;white-space:nowrap;border:1px dashed #d0d5dd;border-radius:8px;padding:2px 6px;font-size:12.5px}
+.ac-inline.on{border-style:solid;border-color:#75e0a7;background:#f6fef9}
+.ac-inline.bad{border-color:#fda29b;background:#fef3f2}
+.ac-inline input{width:84px;height:26px;border:1px solid #d0d5dd;border-radius:6px;padding:0 6px;text-align:right;font-weight:600}
+.ac-inline input.ac-ref{width:120px;text-align:left;font-weight:400}
+.ac-inline select{height:26px;border:1px solid #d0d5dd;border-radius:6px;max-width:110px}
+.dc-advance{display:inline-flex;align-items:center;gap:6px;flex:none;white-space:nowrap;padding:3px 8px;border-radius:999px;background:#ecfdf3;border:1px solid #abefc6;color:#067647;font-size:12.5px;font-weight:600}
+.dc-advance.off{background:#f9fafb;border-color:#d0d5dd;color:#475467}
+.dc-advance input{margin:0}
+.ac-table td.mono,.ac-table td:nth-child(2){white-space:nowrap}
+.ac-page .ac-table th,.ac-page .ac-table td{padding-left:8px;padding-right:8px}
+.ac-page .ac-table td:first-child{min-width:150px;white-space:normal}
+.ac-page .ac-table .row-actions{display:flex;gap:4px;justify-content:flex-end}
+.ac-page .ac-table .row-actions .btn{padding:3px 8px}
+.ac-inline input,.ac-inline select{box-sizing:border-box;height:28px!important;min-height:0!important;padding:0 6px!important;font-size:12.5px!important;line-height:26px}
+.ac-inline select{padding-right:2px!important}
+.dc-billdisc{display:inline-flex;align-items:center;gap:5px;flex:none;white-space:nowrap;font-size:12.5px;font-weight:600;color:#344054;border:1px dashed #d0d5dd;border-radius:8px;padding:2px 6px}
+.dc-billdisc input{width:56px;height:26px!important;min-height:0!important;padding:0 6px!important;text-align:right;border:1px solid #d0d5dd;border-radius:6px;font-weight:600}

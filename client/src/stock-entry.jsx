@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { MaxButton } from './maximize.jsx';
 import { ADJUSTMENT_REASONS } from '../../shared/domain.mjs';
 import { ApiError } from './api.js';
 import { useAuth } from './auth.jsx';
@@ -24,6 +25,7 @@ function Window({ title, onClose, children }) {
       <div className="modal-card matrix-modal se-window" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
         <div className="card-head">
           <h2>{title}</h2>
+          <MaxButton focus={false} />
           <button type="button" className="btn" onClick={onClose}>Close</button>
         </div>
         {children}

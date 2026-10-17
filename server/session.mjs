@@ -1,5 +1,6 @@
 import { FEATURE_KEYS, LOCKED_FEATURES, companyTypeLabel } from '../shared/domain.mjs';
-import { licenceOf, verticalModules } from '../shared/licensing.mjs';
+import { licenceOf, typeRules } from '../shared/licensing.mjs';
+import { readTypeMapping } from './type-mapping.mjs';
 import { readPackages } from './admin.mjs';
 
 export async function loadSession(store, userId) {
@@ -15,7 +16,9 @@ export async function loadSession(store, userId) {
   const settings = await store.find('settings', { company_id: company.id });
   const toggles = new Map(settings.map((row) => [row.setting_key, row.setting_value === '1' || row.setting_value === 1]));
   // a module is allowed by the package and fits the business type (the Admin Panel can force one on)
-  const fits = new Set(verticalModules(company.business_type));
+  // the company type decides which modules fit and which screens it sees (Admin Panel → Company Types & Features)
+  const typed = typeRules(company, await readTypeMapping(store));
+  const fits = typed.fits;
   const allowedKey = (key) => Boolean(lic.modules[key] && (fits.has(key) || lic.moduleOverrides[key] === true));
   const modules = FEATURE_KEYS.map((key) => ({
     key,
@@ -46,11 +49,11 @@ export async function loadSession(store, userId) {
       status: company.status,
       trialEndsAt: lic.mode === 'trial' ? company.expires_at : null,
       plan: { code: lic.packageCode, name: lic.packageName },
-      licence: { packageCode: lic.packageCode, packageName: lic.packageName, mode: lic.mode, trial: lic.trial, expired: lic.expired, daysLeft: lic.daysLeft, trialEndsAt: lic.mode === 'trial' ? company.expires_at : null },
+      licence: { packageCode: lic.packageCode, packageName: lic.packageName, mode: lic.mode, trial: lic.trial, expired: lic.expired, daysLeft: lic.daysLeft, trialEndsAt: lic.mode === 'trial' ? company.expires_at : null, paidExpired: lic.paidExpired, paidUntil: lic.paidUntil || '', paidDaysLeft: lic.paidDaysLeft, moduleExpiry: lic.moduleExpiry, expiredModules: lic.expiredModules },
     },
     modules,
     // menu screens switched off for this company's package (Admin Panel → Packages / company)
-    disabledFeatures: Object.entries(lic.features).filter(([, on]) => !on).map(([id]) => id),
+    disabledFeatures: Object.entries(lic.features).filter(([id, on]) => !on || (typed.hidden.has(id) && lic.featureOverrides[id] !== true)).map(([id]) => id),
     limits: { locations: lic.limits.locations, users: lic.limits.users },
   };
 }

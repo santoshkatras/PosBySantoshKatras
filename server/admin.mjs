@@ -2,11 +2,13 @@
 // (Free Tier / Starter / Standard / Professional), switches modules and features on or off per package
 // or per company, extends trials and enables / disables a company.
 // Table platform_settings (no company): setting_key, setting_value — 'packages' (JSON) and 'admin' (JSON).
-import { FEATURE_KEYS, LOCKED_FEATURES, companyTypeLabel } from '../shared/domain.mjs';
+import { COMPANY_TYPES, FEATURE_KEYS, LOCKED_FEATURES, companyTypeLabel } from '../shared/domain.mjs';
 import { newCompanyCode } from './provision.mjs';
-import { DEFAULT_PACKAGES, MODULE_LABELS, PACKAGE_CODES, TRIAL_DAYS, featureCatalog, licenceOf, mergePackages, verticalModules } from '../shared/licensing.mjs';
+import { DEFAULT_PACKAGES, MODULE_LABELS, PACKAGE_CODES, TRIAL_DAYS, featureCatalog, licenceOf, mergePackages, typeRules } from '../shared/licensing.mjs';
+import { readTypeMapping, writeTypeMapping } from './type-mapping.mjs';
 import { hashPassword, readAdmin, signAdmin, verifyPassword } from './auth.mjs';
 import { ACTION_LABELS, companyView, createAudit, packagesView } from './admin-audit.mjs';
+import { registerAdminActivity } from './admin-activity.mjs';
 
 const DAY = 86400000;
 let cache = null;
@@ -110,7 +112,38 @@ export function registerAdmin(app, store, { route, fail, bearer }) {
       features: featureCatalog(),
       packages: await readPackages(store),
       trialDays: TRIAL_DAYS,
+      companyTypes: COMPANY_TYPES.map(([id, label]) => ({ id, label })),
+      typeMapping: await readTypeMapping(store),
     });
+  }));
+
+  // ---------- company types vs features ----------
+  // body: { mapping, apply: [companyType] } — apply: also set the module switches of existing companies of those types
+  app.put('/api/admin/type-mapping', requireAdmin, route(async (req, res) => {
+    const before = await readTypeMapping(store);
+    const mapping = await writeTypeMapping(store, req.body?.mapping);
+    const apply = new Set((Array.isArray(req.body?.apply) ? req.body.apply : []).map(String));
+    const effects = [];
+    if (apply.size) {
+      for (const company of (await store.find('companies', {})).filter((c) => c.status !== 'deleted' && apply.has(c.company_type))) {
+        const map = mapping[company.company_type];
+        const rows = await store.find('settings', { company_id: company.id });
+        const on = []; const offList = [];
+        for (const key of FEATURE_KEYS) {
+          if (LOCKED_FEATURES.includes(key)) continue;
+          const want = map.modules[key] ? '1' : '0';
+          const row = rows.find((r) => r.setting_key === key);
+          if (row && String(row.setting_value) === want) continue;
+          if (row) await store.update('settings', row.id, { setting_value: want }); else await store.insert('settings', { company_id: company.id, setting_key: key, setting_value: want });
+          (want === '1' ? on : offList).push(MODULE_LABELS[key] || key);
+        }
+        if (on.length || offList.length) effects.push(`${company.name}: ${on.length ? `on ${on.join(', ')}` : ''}${on.length && offList.length ? ' · ' : ''}${offList.length ? `off ${offList.join(', ')}` : ''}`);
+      }
+    }
+    const label = (id) => COMPANY_TYPES.find(([k]) => k === id)?.[1] || id;
+    const view = (m) => { const v = {}; for (const [id, t] of Object.entries(m)) { for (const k of FEATURE_KEYS) v[`${id}.module.${k}`] = { group: label(id), label: `Module · ${MODULE_LABELS[k] || k}`, value: t.modules[k] ? 'Yes' : 'No' }; for (const f of featureCatalog()) v[`${id}.feature.${f.id}`] = { group: label(id), label: `Screen · ${f.group} › ${f.label}`, value: t.features[f.id] !== false ? 'Yes' : 'No' }; } return v; };
+    await audit.write(req, { action: 'types.update', admin: req.admin, targetType: 'type_mapping', targetId: 'type_mapping', targetName: 'Company Types & Features', before: view(before), after: view(mapping), effects });
+    res.json({ typeMapping: mapping, effects });
   }));
 
   // ---------- packages ----------
@@ -150,7 +183,7 @@ export function registerAdmin(app, store, { route, fail, bearer }) {
   }
   // a module the licence newly allows is switched on for the company (only the ones that fit its business type)
   async function switchOnNew(company, before, after) {
-    const fit = new Set(verticalModules(company.business_type));
+    const fit = typeRules(company, await readTypeMapping(store)).fits;
     const fresh = FEATURE_KEYS.filter((key) => after.modules[key] && !before.modules[key] && fit.has(key));
     if (fresh.length) await toggleOn(company, fresh);
     return fresh;
@@ -170,7 +203,7 @@ export function registerAdmin(app, store, { route, fail, bearer }) {
       status: company.status === 'suspended' ? 'disabled' : 'enabled',
       users: own.filter((u) => u.status === 'active').length,
       locations: locations.filter((l) => l.company_id === company.id && (l.is_active === 1 || l.is_active === '1' || l.is_active === true)).length,
-      licence: { ...lic, trialEndsAt: day(lic.trialEndsAt) },
+      licence: { ...lic, trialEndsAt: day(lic.trialEndsAt), paidUntil: day(lic.paidUntil) },
       notes: company.admin_notes || '',
     };
   }
@@ -223,6 +256,15 @@ export function registerAdmin(app, store, { route, fail, bearer }) {
       patch.limit_overrides = JSON.stringify(lim);
     }
     if (b.notes !== undefined) patch.admin_notes = String(b.notes || '').slice(0, 500);
+    if (b.paidUntil !== undefined) {
+      if (b.paidUntil && !/^\d{4}-\d{2}-\d{2}$/.test(b.paidUntil)) return fail(res, 400, 'INVALID', 'Licence valid-till date is not valid.');
+      patch.paid_until = b.paidUntil ? new Date(`${b.paidUntil}T23:59:59`).toISOString() : '';
+    }
+    if (b.moduleExpiry !== undefined) {
+      const out = {};
+      for (const [k, v] of Object.entries(b.moduleExpiry || {})) if (FEATURE_KEYS.includes(k) && !LOCKED_FEATURES.includes(k) && /^\d{4}-\d{2}-\d{2}$/.test(String(v))) out[k] = String(v);
+      patch.module_expiry = JSON.stringify(out);
+    }
     await store.update('companies', company.id, patch);
     const [saved] = await store.find('companies', { id: company.id });
     const after = licenceOf(saved, packages);
@@ -231,7 +273,7 @@ export function registerAdmin(app, store, { route, fail, bearer }) {
     const forced = FEATURE_KEYS.filter((k) => after.moduleOverrides[k] === true && !before.moduleOverrides[k]);
     if (forced.length) await toggleOn(saved, forced);
     const turnedOn = [...new Set([...fresh, ...forced])];
-    await audit.write(req, { action: 'company.update', admin: req.admin, targetType: 'company', targetId: company.id, targetName: company.name, targetCode: company.company_code || '', before: companyView(company, packages), after: companyView(saved, packages), effects: turnedOn.length ? [`Switched on in the company's settings: ${turnedOn.map((k) => MODULE_LABELS[k] || k).join(', ')}`] : [] });
+    await audit.write(req, { action: 'company.update', admin: req.admin, targetType: 'company', targetId: company.id, targetName: company.name, targetCode: company.company_code || '', before: companyView(company, packages, await readTypeMapping(store)), after: companyView(saved, packages, await readTypeMapping(store)), effects: turnedOn.length ? [`Switched on in the company's settings: ${turnedOn.map((k) => MODULE_LABELS[k] || k).join(', ')}`] : [] });
     await reply(res, company.id);
   }));
   // Extend trial: +N days from the later of today / the current trial end; the company goes back on trial
@@ -247,9 +289,11 @@ export function registerAdmin(app, store, { route, fail, bearer }) {
     await store.update('companies', company.id, { license_mode: 'trial', expires_at: until.toISOString(), status: company.status === 'suspended' ? 'suspended' : 'trial', ...(company.package ? {} : { package: 'professional' }) });
     const [saved] = await store.find('companies', { id: company.id });
     const fresh = await switchOnNew(saved, before, licenceOf(saved, packages));
-    await audit.write(req, { action: 'company.extend', admin: req.admin, targetType: 'company', targetId: company.id, targetName: company.name, targetCode: company.company_code || '', before: companyView(company, packages), after: companyView(saved, packages), effects: [`+${days} day${days === 1 ? '' : 's'} added — trial now ends ${until.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`, ...(fresh.length ? [`Switched on: ${fresh.map((k) => MODULE_LABELS[k] || k).join(', ')}`] : [])] });
+    await audit.write(req, { action: 'company.extend', admin: req.admin, targetType: 'company', targetId: company.id, targetName: company.name, targetCode: company.company_code || '', before: companyView(company, packages, await readTypeMapping(store)), after: companyView(saved, packages, await readTypeMapping(store)), effects: [`+${days} day${days === 1 ? '' : 's'} added — trial now ends ${until.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`, ...(fresh.length ? [`Switched on: ${fresh.map((k) => MODULE_LABELS[k] || k).join(', ')}`] : [])] });
     await reply(res, company.id);
   }));
+
+  registerAdminActivity(app, store, { requireAdmin, route, fail, readPackages });
 
   // ---------- audit log ----------
   app.get('/api/admin/logs', requireAdmin, route(async (req, res) => {

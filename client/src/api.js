@@ -6,6 +6,8 @@ export class ApiError extends Error {
   }
 }
 
+const sid = () => { try { return sessionStorage.getItem('skpos_sid') || ''; } catch { return ''; } };
+
 export async function api(path, { method = 'GET', body, token } = {}) {
   const response = await fetch(`/api${path}`, {
     method,
@@ -13,6 +15,7 @@ export async function api(path, { method = 'GET', body, token } = {}) {
     headers: {
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(sid() ? { 'x-skpos-sid': sid() } : {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });

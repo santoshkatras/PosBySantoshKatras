@@ -351,3 +351,9 @@
 @media (max-height:760px){.ax-v2 .ax-form-head p{display:none}.v2-feed li:nth-child(n+4){display:none}}
 @media (max-width:1180px){.ax.ax-v2{grid-template-columns:minmax(400px,1fr) minmax(0,1fr)}.v2-kpis{grid-template-columns:repeat(2,1fr)}.v2-mid{grid-template-columns:1fr}.v2-feed{display:none}}
 @media (max-width:1080px){.ax.ax-v2{grid-template-columns:1fr}.v2-scene{display:none}.ax-v2 .ax-side{align-items:center}}
+/* company type list opens above the buttons below it; Liquor / Wine Shop tile colour */
+.ax-field.ax-type{position:relative;z-index:40}
+.ax-type .ax-menu{z-index:50}
+.t-liquor_shop{background:#8a2b3d}
+/* the step panel animates (transform → its own layer); lift it over the Continue / Back buttons */
+.ax-stage{position:relative;z-index:5}

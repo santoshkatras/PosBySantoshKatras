@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { MaxButton } from './maximize.jsx';
 import { useAuth } from './auth.jsx';
 import { useFeedback } from './feedback.jsx';
 import { useFitHeight } from './fit-height.js';
@@ -410,7 +411,7 @@ export function PriceUpdateWindow({ onClose, onSaved }) {
             <h2>Create Price Update</h2>
             <p>Type or scan an item code, or search by name. A window opens for the item type to change MRP, selling and cost prices.</p>
           </div>
-          <button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
+          <MaxButton /><button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
         </header>
         <div className="ose-head">
           <label>Update No.<input value={number || '…'} readOnly className="mono" /></label>

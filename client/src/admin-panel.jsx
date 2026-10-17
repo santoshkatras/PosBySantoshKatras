@@ -2,8 +2,10 @@
 // package per company, module / feature switches per company, trial extension, enable / disable.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api.js';
-import { verticalModules } from '../../shared/licensing.mjs';
+import { typeRules } from '../../shared/licensing.mjs';
+import { TypesTab } from './admin-types.jsx';
 import { useFeedback } from './feedback.jsx';
+import { ActivityTab } from './admin-activity.jsx';
 import './opening-stock.css';
 import './documents.css';
 import './admin-panel.css';
@@ -22,7 +24,9 @@ function GeoText({ geo, compact = false }) {
 }
 
 function licenceText(lic) {
+  if (lic.paidExpired) return { text: 'Licence expired', cls: 'over' };
   if (lic.expired) return { text: 'Trial ended', cls: 'over' };
+  if (lic.paidUntil && lic.paidDaysLeft != null) return { text: `Active · till ${shortDay(lic.paidUntil)}`, cls: lic.paidDaysLeft <= 15 ? 'low' : 'paid' };
   if (lic.trial) return { text: `Trial · ${lic.daysLeft} day${lic.daysLeft === 1 ? '' : 's'} left`, cls: lic.daysLeft <= 3 ? 'low' : 'trial' };
   return { text: 'Active (paid)', cls: 'paid' };
 }
@@ -80,6 +84,7 @@ function CompanyWindow({ token, company: start, catalog, onClose, onSaved }) {
     package: start.licence.chosenPackage, mode: start.licence.mode, trialEndsAt: start.licence.trialEndsAt || '', status: start.status,
     moduleOverrides: { ...start.licence.moduleOverrides }, featureOverrides: { ...start.licence.featureOverrides },
     limitOverrides: { locations: start.licence.limitOverrides?.locations || '', users: start.licence.limitOverrides?.users || '' }, notes: start.notes || '',
+    paidUntil: start.licence.paidUntil || '', moduleExpiry: { ...(start.licence.moduleExpiry || {}) },
   });
   const [f, setF] = useState(initial);
   const first = useRef(JSON.stringify(initial()));
@@ -88,7 +93,9 @@ function CompanyWindow({ token, company: start, catalog, onClose, onSaved }) {
   const [extendDays, setExtendDays] = useState('');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
-  const pkg = catalog.packages.find((p) => p.code === (f.mode === 'trial' && f.trialEndsAt && Date.parse(`${f.trialEndsAt}T23:59:59`) < Date.now() ? 'free' : f.package)) || catalog.packages[catalog.packages.length - 1];
+  const pkg = catalog.packages.find((p) => p.code === ((f.mode === 'trial' && f.trialEndsAt && Date.parse(`${f.trialEndsAt}T23:59:59`) < Date.now()) || (f.mode === 'active' && f.paidUntil && Date.parse(`${f.paidUntil}T23:59:59`) < Date.now()) ? 'free' : f.package)) || catalog.packages[catalog.packages.length - 1];
+  const addYear = (from) => { const d = new Date(Math.max(Date.now(), from ? Date.parse(`${from}T00:00:00`) : 0)); d.setFullYear(d.getFullYear() + 1); return d.toISOString().slice(0, 10); };
+  const modExpired = (key) => Boolean(f.moduleExpiry[key]) && Date.parse(`${f.moduleExpiry[key]}T23:59:59`) < Date.now();
   const setOv = (kind, id, value) => setF((cur) => { const next = { ...cur[kind] }; if (value === undefined) delete next[id]; else next[id] = value; return { ...cur, [kind]: next }; });
   const changed = JSON.stringify(f) !== first.current;
   const lic = licenceText(company.licence);
@@ -127,10 +134,11 @@ function CompanyWindow({ token, company: start, catalog, onClose, onSaved }) {
     document.addEventListener('keydown', key);
     return () => document.removeEventListener('keydown', key);
   }, []);
-  const fits = new Set(verticalModules(company.businessType));
+  const typed = typeRules(company, catalog.typeMapping);
+  const fits = typed.fits;
   // on for the company: package (or this company's switch) and it fits the business type unless forced on
   const modOn = (key) => (typeof f.moduleOverrides[key] === 'boolean' ? f.moduleOverrides[key] : Boolean(pkg.modules[key]) && fits.has(key));
-  const featOn = (feat) => (typeof f.featureOverrides[feat.id] === 'boolean' ? f.featureOverrides[feat.id] : pkg.features[feat.id] !== false);
+  const featOn = (feat) => (typeof f.featureOverrides[feat.id] === 'boolean' ? f.featureOverrides[feat.id] : pkg.features[feat.id] !== false && !typed.hidden.has(feat.id));
   const s = q.trim().toLowerCase();
   const feats = catalog.features.filter((x) => !s || `${x.group} ${x.label}`.toLowerCase().includes(s));
   const modules = catalog.modules.filter((x) => !s || x.label.toLowerCase().includes(s));
@@ -148,7 +156,9 @@ function CompanyWindow({ token, company: start, catalog, onClose, onSaved }) {
         <div className="ose-head">
           <label>Package<select value={f.package} onChange={(e) => setF({ ...f, package: e.target.value })}>{catalog.packages.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</select></label>
           <label>Licence<select value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="trial">Trial</option><option value="active">Active (paid)</option></select></label>
-          <label>Trial ends<input type="date" value={f.trialEndsAt} disabled={f.mode !== 'trial'} onChange={(e) => setF({ ...f, trialEndsAt: e.target.value })} /></label>
+          {f.mode === 'trial' ? <label>Trial ends<input type="date" value={f.trialEndsAt} onChange={(e) => setF({ ...f, trialEndsAt: e.target.value })} /></label> : (
+            <label>Licence valid till<span className="ap-paid"><input type="date" value={f.paidUntil} onChange={(e) => setF({ ...f, paidUntil: e.target.value })} title="Leave empty for no end date" /><button type="button" className="btn" onClick={() => setF({ ...f, paidUntil: addYear(f.paidUntil) })} title="Renew for one year">+1 yr</button></span></label>
+          )}
           <label>Company status<select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}><option value="enabled">Enabled</option><option value="disabled">Disabled (cannot sign in)</option></select></label>
           <label>Locations limit<input inputMode="numeric" placeholder={`Package: ${pkg.limits.locations}`} value={f.limitOverrides.locations} onChange={(e) => setF({ ...f, limitOverrides: { ...f.limitOverrides, locations: e.target.value.replace(/[^0-9]/g, '') } })} /></label>
           <label>Users limit<input inputMode="numeric" placeholder={`Package: ${pkg.limits.users}`} value={f.limitOverrides.users} onChange={(e) => setF({ ...f, limitOverrides: { ...f.limitOverrides, users: e.target.value.replace(/[^0-9]/g, '') } })} /></label>
@@ -158,7 +168,7 @@ function CompanyWindow({ token, company: start, catalog, onClose, onSaved }) {
           {[7, 15, 30].map((d) => <button key={d} type="button" className="btn" disabled={pending} onClick={() => extend(d)}>+{d} days</button>)}
           <input inputMode="numeric" placeholder="Days" value={extendDays} onChange={(e) => setExtendDays(e.target.value.replace(/[^0-9]/g, ''))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); extend(extendDays); } }} aria-label="Days to add" />
           <button type="button" className="btn primary" disabled={pending || !extendDays} onClick={() => extend(extendDays)}>Extend</button>
-          <span className="ap-muted">{f.mode === 'trial' ? `On ${pkg.name} until ${shortDay(f.trialEndsAt)}. When a trial ends the company moves to ${catalog.packages.find((p) => p.code === 'free')?.name || 'Free Tier'}.` : 'Paid licence — no trial end.'}</span>
+          <span className="ap-muted">{f.mode === 'trial' ? `On ${pkg.name} until ${shortDay(f.trialEndsAt)}. When a trial ends the company moves to ${catalog.packages.find((p) => p.code === 'free')?.name || 'Free Tier'}.` : f.paidUntil ? `Paid licence valid till ${shortDay(f.paidUntil)} — after that the company moves to ${catalog.packages.find((p) => p.code === 'free')?.name || 'Free Tier'}.` : 'Paid licence — no end date.'}</span>
         </div>
         <div className="ap-subtabs">
           <button type="button" className={tab === 'modules' ? 'on' : ''} onClick={() => setTab('modules')}>Modules</button>
@@ -171,13 +181,14 @@ function CompanyWindow({ token, company: start, catalog, onClose, onSaved }) {
         <div className="ose-table">
           {tab === 'modules' ? (
             <table>
-              <thead><tr><th>Module</th><th>In {pkg.name}</th><th>This company</th><th>Result</th></tr></thead>
+              <thead><tr><th>Module</th><th>In {pkg.name}</th><th>This company</th><th>Add-on valid till</th><th>Result</th></tr></thead>
               <tbody>{modules.map((m) => (
                 <tr key={m.key}>
-                  <td><b>{m.label}</b>{m.locked ? <small className="ap-muted"> · always on</small> : !fits.has(m.key) ? <small className="ap-muted"> · not used by {TYPE[company.businessType] || 'this business type'} (Enable to force on)</small> : null}</td>
+                  <td><b>{m.label}</b>{m.locked ? <small className="ap-muted"> · always on</small> : !fits.has(m.key) ? <small className="ap-muted"> · not mapped to {typed.mapped ? company.companyTypeLabel : TYPE[company.businessType] || 'this business type'} (Enable to force on)</small> : null}</td>
                   <td>{pkg.modules[m.key] ? 'Yes' : <span className="ap-muted">No</span>}</td>
                   <td>{m.locked ? <span className="ap-muted">—</span> : <OverrideSelect label={m.label} value={f.moduleOverrides[m.key]} onChange={(v) => setOv('moduleOverrides', m.key, v)} />}</td>
-                  <td><span className={`ap-pill ${modOn(m.key) ? 'paid' : 'off'}`}>{modOn(m.key) ? 'On' : 'Off'}</span></td>
+                  <td>{m.locked ? <span className="ap-muted">—</span> : <span className="ap-paid"><input type="date" aria-label={`${m.label} valid till`} value={f.moduleExpiry[m.key] || ''} onChange={(e) => setF((cur) => { const next = { ...cur.moduleExpiry }; if (e.target.value) next[m.key] = e.target.value; else delete next[m.key]; return { ...cur, moduleExpiry: next }; })} />{f.moduleExpiry[m.key] ? <button type="button" className="btn" title="Renew this add-on for one year" onClick={() => setF((cur) => ({ ...cur, moduleExpiry: { ...cur.moduleExpiry, [m.key]: addYear(cur.moduleExpiry[m.key]) } }))}>+1 yr</button> : null}</span>}</td>
+                  <td><span className={`ap-pill ${modOn(m.key) && !modExpired(m.key) ? 'paid' : 'off'}`} title={modExpired(m.key) ? 'Add-on expired' : undefined}>{modExpired(m.key) ? 'Expired' : modOn(m.key) ? 'On' : 'Off'}</span></td>
                 </tr>
               ))}</tbody>
             </table>
@@ -189,7 +200,7 @@ function CompanyWindow({ token, company: start, catalog, onClose, onSaved }) {
                 const on = featOn(x) && mod;
                 return (
                   <tr key={x.id} className={mod ? undefined : 'ap-dim'}>
-                    <td className="ap-muted">{x.group}</td><td><b>{x.label}</b></td>
+                    <td className="ap-muted">{x.group}</td><td><b>{x.label}</b>{typed.hidden.has(x.id) ? <small className="ap-muted"> · not mapped to {company.companyTypeLabel} (Enable to force on)</small> : null}</td>
                     <td className="ap-muted">{x.module ? catalog.modules.find((m) => m.key === x.module)?.label : '—'}</td>
                     <td>{pkg.features[x.id] !== false ? 'Yes' : <span className="ap-muted">No</span>}</td>
                     <td><OverrideSelect label={x.label} value={f.featureOverrides[x.id]} onChange={(v) => setOv('featureOverrides', x.id, v)} /></td>
@@ -361,7 +372,7 @@ function FragmentRows({ group, list, set, catalog }) {
 
 // ---------- audit log ----------
 const stamp = (v) => (v ? new Date(v).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : '—');
-const ACTION_CLS = { 'company.update': 'trial', 'company.extend': 'paid', 'packages.update': 'low', 'admin.login': 'off', 'admin.login_failed': 'over', 'admin.password': 'low', 'admin.setup': 'paid' };
+const ACTION_CLS = { 'company.update': 'trial', 'company.extend': 'paid', 'packages.update': 'low', 'types.update': 'low', 'admin.login': 'off', 'admin.login_failed': 'over', 'admin.password': 'low', 'admin.setup': 'paid' };
 const Val = ({ v, cls }) => <span className={`ap-val ${cls || ''}${v === '—' ? ' none' : ''}`}>{v}</span>;
 
 function LogDetail({ token, id, onClose }) {
@@ -553,6 +564,8 @@ export function AdminPanelPage() {
         <nav className="ap-tabs">
           <button type="button" className={tab === 'companies' ? 'on' : ''} onClick={() => setTab('companies')}>Companies</button>
           <button type="button" className={tab === 'packages' ? 'on' : ''} onClick={() => setTab('packages')}>Packages &amp; Features</button>
+          <button type="button" className={tab === 'types' ? 'on' : ''} onClick={() => setTab('types')}>Company Types</button>
+          <button type="button" className={tab === 'activity' ? 'on' : ''} onClick={() => setTab('activity')}>Customer Activity</button>
           <button type="button" className={tab === 'logs' ? 'on' : ''} onClick={() => setTab('logs')}>Audit Log</button>
         </nav>
         <div className="ap-me">
@@ -563,7 +576,7 @@ export function AdminPanelPage() {
       </header>
       <main className="ap-main workforce">
         {error ? <p className="ose-error">{error}</p> : null}
-        {!catalog ? <p className="ap-muted">Loading…</p> : tab === 'companies' ? <CompaniesTab token={token} catalog={catalog} /> : tab === 'logs' ? <LogsTab token={token} /> : <PackagesTab token={token} catalog={catalog} onSaved={(packages) => setCatalog({ ...catalog, packages })} />}
+        {!catalog ? <p className="ap-muted">Loading…</p> : tab === 'companies' ? <CompaniesTab token={token} catalog={catalog} /> : tab === 'logs' ? <LogsTab token={token} /> : tab === 'activity' ? <ActivityTab token={token} /> : tab === 'types' ? <TypesTab token={token} catalog={catalog} onSaved={(typeMapping) => setCatalog({ ...catalog, typeMapping })} /> : <PackagesTab token={token} catalog={catalog} onSaved={(packages) => setCatalog({ ...catalog, packages })} />}
       </main>
       {pass ? <PasswordPopup token={token} onClose={() => setPass(false)} /> : null}
     </div>

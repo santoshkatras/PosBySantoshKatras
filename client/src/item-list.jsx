@@ -350,7 +350,7 @@ export function ItemList({ products, categories, brands, labels = {}, onAdd, onE
             </thead>
             <tbody>
               {pageRows.length ? pageRows.map((row) => (
-                <tr key={row.id} className={openId === row.id ? 'on' : undefined} onClick={() => setOpenId(openId === row.id ? '' : row.id)} onDoubleClick={() => editItem(row)} title={can('catalogue.manage') ? 'Double-click to edit' : undefined}>
+                <tr key={row.id} data-kb-row="check" tabIndex={0} className={openId === row.id ? 'on' : undefined} onClick={() => setOpenId(openId === row.id ? '' : row.id)} onDoubleClick={() => editItem(row)} title={can('catalogue.manage') ? 'Double-click to edit' : undefined}>
                   <td onClick={(event) => event.stopPropagation()}>
                     <input type="checkbox" aria-label={`Select ${row.name}`} checked={selected.has(row.id)} onChange={(event) => setSelected((current) => {
                       const next = new Set(current);

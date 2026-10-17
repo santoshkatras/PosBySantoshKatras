@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
+import { MaxButton } from './maximize.jsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from './auth.jsx';
+import { LiquorDocFields } from './liquor.jsx';
 import { useFeedback } from './feedback.jsx';
 import { BatchEditor, batchTotal, blankBatch } from './batch-entry.jsx';
 import { checkBatches, formatExpiry } from '../../shared/expiry.mjs';
@@ -12,6 +14,9 @@ import { applyFormula, formulaForSupplier, priceLine } from '../../shared/purcha
 import { STATES } from '../../shared/domain.mjs';
 import { OfferBar, PaymentPopup, useBillPromotions } from './bill-payment.jsx';
 import { HeldBillsPopup, LoadOrderPopup, ReturnExchangePopup } from './bill-tools.jsx';
+import { AdvanceField } from './accounts.jsx';
+import { focusNext } from './keyboard.js';
+import './accounts.css';
 import { PartyHistory } from './party-history.jsx';
 import { AGE_COLUMNS, ColumnPicker, EanStrip, LotPicker, ScanBar, ageOf, lotTotal, useColumns, useScanMode, useStockBarcodeConfig } from './line-tools.jsx';
 import { isStockBarcode } from '../../shared/stock-barcode.mjs';
@@ -178,7 +183,14 @@ function PartyField({ parties, label, partyId, partyName, onChange, allowFree, i
   function key(event) {
     if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); setActive((value) => Math.min(value + 1, matches.length - 1)); }
     else if (event.key === 'ArrowUp') { event.preventDefault(); setActive((value) => Math.max(value - 1, 0)); }
-    else if (event.key === 'Enter') { event.preventDefault(); if (open && matches[active]) pick(matches[active]); }
+    else if (event.key === 'Enter') {
+      event.preventDefault();
+      const typed = q && chosen?.name !== text;
+      if (open && matches[active] && typed) pick(matches[active]);
+      else if (open && matches[active] && !text.trim() && active > 0) pick(matches[active]);
+      setOpen(false);
+      if (!typed || matches[active] || allowFree) focusNext(event.currentTarget, event.shiftKey);
+    }
     else if (event.key === 'Escape' && open) { event.stopPropagation(); setOpen(false); }
   }
   return (
@@ -223,7 +235,7 @@ const marginPct = (sale, landing, gst) => { const ex = num(sale) / (1 + num(gst)
 const INWARD_STD_COLS = [['disc', 'Discount %'], ['landing', 'Landing ₹'], ['mrp', 'MRP ₹'], ['sale', 'Selling ₹'], ['margin', 'Margin %'], ['total', 'Line total'], ['ean', 'UPC / EAN codes']];
 const INWARD_GRID_COLS = [['mrp', 'MRP ₹'], ['sale', 'Selling ₹'], ['landing', 'Landing ₹'], ['margin', 'Margin %'], ['amount', 'Amount ₹'], ['ean', 'Barcode / EAN']];
 
-function QtyPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose, selling, locationId, pickMode = 'ask' }) {
+function QtyPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose, selling, locationId, pickMode = 'ask', lockRate = false }) {
   const [unit, setUnit] = useState(() => openUnit(line));
   const f = factorOf(unit);
   const [row, setRow] = useState(() => rowFromBase(line.variants[0], openUnit(line)));
@@ -307,7 +319,7 @@ function QtyPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose,
           </>
         ) : (
           <>
-            <label>{meta.rate === 'cost' ? 'Purchase rate ₹' : 'Selling rate ₹'}{f !== 1 ? ` / ${unit.name}` : ''}<input inputMode="decimal" value={row.rate} onChange={set('rate')} onKeyDown={enter} /></label>
+            <label>{meta.rate === 'cost' ? 'Purchase rate ₹' : 'Selling rate ₹'}{f !== 1 ? ` / ${unit.name}` : ''}<input inputMode="decimal" value={row.rate} readOnly={lockRate} title={lockRate ? 'Rate editing is switched off in Sales Configurations' : undefined} onChange={set('rate')} onKeyDown={enter} /></label>
             {!inward || cols.on('disc') ? <DiscField value={disc} onChange={setDisc} onKeyDown={enter} /> : null}
           </>
         )}
@@ -332,7 +344,7 @@ function QtyPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose,
   );
 }
 
-function GridPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose, selling, locationId, pickMode = 'ask', item, onItem }) {
+function GridPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose, selling, locationId, pickMode = 'ask', item, onItem, lockRate = false }) {
   const { request, can } = useAuth();
   const [unit, setUnit] = useState(() => openUnit(line));
   const f = factorOf(unit);
@@ -462,7 +474,7 @@ function GridPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose
                 {mx.dims.length ? null : <td>{row.name}</td>}
                 <td className="mono mx-code">{row.barcode || row.sku}</td>
                 {cols.map(([key, label]) => (
-                  <td key={key} className="num"><input data-col={key} inputMode="decimal" aria-label={`${label} for ${row.sku}`} value={row[key] ?? ''} placeholder={key === 'salePrice' && suggestOf(row) > 0 ? String(suggestOf(row)) : key === 'disc' ? String(num(disc) || 0) : undefined} onChange={(event) => set(row.variantId, key, event.target.value)} onKeyDown={(event) => move(event, index, key)} onFocus={(event) => { event.target.select(); setFocusVariant(row.variantId); }} /></td>
+                  <td key={key} className="num"><input data-col={key} inputMode="decimal" readOnly={lockRate && key === 'rate'} aria-label={`${label} for ${row.sku}`} value={row[key] ?? ''} placeholder={key === 'salePrice' && suggestOf(row) > 0 ? String(suggestOf(row)) : key === 'disc' ? String(num(disc) || 0) : undefined} onChange={(event) => set(row.variantId, key, event.target.value)} onKeyDown={(event) => move(event, index, key)} onFocus={(event) => { event.target.select(); setFocusVariant(row.variantId); }} /></td>
                 ))}
                 {useFx ? <td className="num">{inr(pricedRow(row.variantId).rate)}</td> : null}
                 {useFx || (inward && gcols.on('landing')) ? <td className="num">{inr(landingOf(row))}</td> : null}
@@ -566,7 +578,7 @@ function SerialInPopup({ line, meta, dir, inclusive, formula, party, onSave, onC
 }
 
 const SERIAL_OUT_COLS = [['barcode', 'Stock barcode'], ['received', 'Received on'], ...AGE_COLUMNS, ['cost', 'Cost ₹'], ['mrp', 'MRP ₹'], ['sale', 'Selling ₹', false]];
-function SerialOutPopup({ line, meta, dir, inclusive, locationId, onSave, onClose }) {
+function SerialOutPopup({ line, meta, dir, inclusive, locationId, onSave, onClose, lockRate = false }) {
   const { request } = useAuth();
   const fields = useSerialFields();
   const ocols = useColumns('out-serial', SERIAL_OUT_COLS);
@@ -612,7 +624,7 @@ function SerialOutPopup({ line, meta, dir, inclusive, locationId, onSave, onClos
             </select>
           </label>
         ) : null}
-        <label>Rate each ₹<input inputMode="decimal" value={rate} onChange={(event) => setRate(decimal(event.target.value))} /></label>
+        <label>Rate each ₹<input inputMode="decimal" value={rate} readOnly={lockRate} title={lockRate ? 'Rate editing is switched off in Sales Configurations' : undefined} onChange={(event) => setRate(decimal(event.target.value))} /></label>
         <label>Discount %<input inputMode="decimal" value={disc} onChange={(event) => setDisc(decimal(event.target.value))} /></label>
       </div>
       {stock ? (
@@ -651,6 +663,8 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
   const [dueDate, setDueDate] = useState('');
   const [note, setNote] = useState(source ? `From ${source.number}` : '');
   const [inclusive, setInclusive] = useState(Boolean(source?.inclusive));
+  const [liquor, setLiquor] = useState({});
+  const [liquorTax, setLiquorTax] = useState(null);
   const [formulaId, setFormulaId] = useState(source?.formula?.id || '');
   const [lines, setLines] = useState([]);
   const [popup, setPopup] = useState(null);
@@ -690,7 +704,7 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
         setLines(source.lines.map((line) => convertLine(line, fromDir, dir, data.items.find((item) => item.key === line.key), source.pending?.[line.id] || {})).filter(Boolean));
         if (!source.formula && module === 'purchase') setFormulaId(formulaForSupplier(data.formulas, source.partyId)?.id || '');
       }
-      setTimeout(() => (source || partyKind === 'customer' ? codeRef : partyRef).current?.focus(), 60);
+      setTimeout(() => ((data.salesRules ? data.salesRules.cursor === 'customer' && !source : !source && partyKind !== 'customer') ? partyRef : codeRef).current?.focus(), 60);
     }).catch((err) => setError(message(err)));
   }, [request, module, type]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -722,12 +736,48 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
   const totals = useMemo(() => docTotals(priced, dir, { inclusive, interState }), [priced, dir, inclusive, interState]);
   const plain = useMemo(() => (isBill ? docTotals(lines, dir, { inclusive, interState }) : totals), [isBill, lines, dir, inclusive, interState, totals]);
   const creditUse = returnCredit ? Math.min(num(returnCredit.amount), totals.grand) : 0;
-  const payable = Math.max(Math.round((totals.grand - creditUse) * 100) / 100, 0);
+  // Advance: Sales Order advance taken now / Purchase invoice paid now / advance used on a Sales Bill
+  const rules = setup?.salesRules || null;
+  const takesAdvance = (module === 'sales' && type === 'order' && rules?.advance !== 'off') || (module === 'purchase' && type === 'invoice');
+  const advRef = useRef(null);
+  const [billDisc, setBillDisc] = useState('');
+  function applyBillDisc(text) {
+    setBillDisc(text);
+    const pct = Math.min(Math.max(num(text), 0), 100);
+    setLines((current) => current.map((line) => ({ ...line, disc: text === '' ? '' : String(pct), variants: (line.variants || []).map((v) => ({ ...v, disc: '' })) })));
+  }
+  // checks from Sales Configurations before saving (the server checks them again)
+  function ruleProblem() {
+    if (!rules) return '';
+    if (rules.customer === 'mandatory' && !partyId) return `Choose a saved customer — a customer is mandatory for ${meta.label}.`;
+    const max = num(rules.maxDiscPct);
+    if (max > 0) {
+      for (const line of lines) {
+        const rows = line.kind === 'serial' ? [{}] : (line.variants || []).filter((v) => num(v.qty) > 0);
+        for (const v of rows) { const d = num(v.disc === '' || v.disc == null ? line.disc : v.disc); if (d > max + 0.0001) return `${line.name}: discount ${d}% is above the allowed ${max}%.`; }
+      }
+    }
+    if (type === 'order' && rules.advance === 'mandatory') {
+      if (!(num(advIn?.amount) > 0)) return 'An advance is mandatory for a Sales Order. Enter the advance amount.';
+      const min = num(rules.minAdvancePct) ? Math.ceil(totals.grand * num(rules.minAdvancePct)) / 100 : 0;
+      if (num(advIn.amount) + 0.004 < min) return `The advance must be at least ${rules.minAdvancePct}% of the order (${inr(min)}).`;
+    }
+    return '';
+  }
+  const [advIn, setAdvIn] = useState(null);
+  const [advAvail, setAdvAvail] = useState(null);
+  const [useAdv, setUseAdv] = useState(true);
+  useEffect(() => {
+    if (!isBill || !partyId) { setAdvAvail(null); return; }
+    request(`/accounts/customer/advance?partyId=${encodeURIComponent(partyId)}&order=${encodeURIComponent(src?.type === 'order' ? src.number : '')}`).then((data) => setAdvAvail(data.total > 0 ? data : null)).catch(() => setAdvAvail(null));
+  }, [isBill, partyId, src?.number, request]); // eslint-disable-line react-hooks/exhaustive-deps
+  const advUse = advAvail && useAdv ? Math.round(Math.min(advAvail.total, Math.max(totals.grand - creditUse, 0)) * 100) / 100 : 0;
+  const payable = Math.max(Math.round((totals.grand - creditUse - advUse) * 100) / 100, 0);
   const refreshHeld = useCallback(() => { if (isBill) request('/held-bills').then((data) => setHeldCount(data.items.length)).catch(() => {}); }, [isBill, request]);
   useEffect(() => { refreshHeld(); }, [refreshHeld]);
 
   function resetBill() {
-    setLines([]); setPartyId(''); setPartyName(''); setRefNo(''); setNote(''); setPayments([]); setCoupon(null); setReturnCredit(null); setSrc(null); setError('');
+    setLines([]); setPartyId(''); setPartyName(''); setRefNo(''); setNote(''); setPayments([]); setCoupon(null); setReturnCredit(null); setSrc(null); setError(''); setLiquor({}); setAdvIn(null); setUseAdv(true);
     setTimeout(() => codeRef.current?.focus(), 40);
   }
   function snapshot() {
@@ -777,6 +827,8 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
       setReturnCredit({ number: result.number, amount: result.amount });
       if (!partyId && result.partyId) { setPartyId(result.partyId); setPartyName(result.partyName); }
       feedback.toast(`${result.number}: ${inr(result.amount)} credit added to this bill. Add the new items.`);
+    } else if (result.mode === 'account') {
+      await feedback.success({ title: `Sales Return ${result.number} saved`, message: `${inr(result.amount)} credited to ${result.partyName}'s account (${result.creditNote?.number || 'credit note'}).`, detail: `Cleared on ${result.billNumber}: ${inr(result.creditNote?.settled || 0)} · On account: ${inr(result.creditNote?.onAccount || 0)}. The stock is back in the location.` });
     } else {
       await feedback.success({ title: `Sales Return ${result.number} saved`, message: `Refund ${inr(result.amount)} in cash to ${result.partyName || 'the customer'}.`, detail: `Against ${result.billNumber}. The stock is back in the location.` });
     }
@@ -787,7 +839,9 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
     if (!lines.length) { setError('Add at least one item.'); codeRef.current?.focus(); return; }
     const missing = lines.find((line) => !flatRows(line, dir).length || summary(line, dir).needs);
     if (missing) { setError(`${missing.name}: ${summary(missing, dir).needs || 'enter a quantity'}. Double-click the line to complete it.`); return; }
-    if (!(await feedback.confirm({ title: 'Cash Save?', message: `Collect ${inr(payable)} in cash and save the bill${returnCredit ? ` (after ${inr(creditUse)} return credit ${returnCredit.number})` : ''}.`, confirmLabel: 'Save cash bill' }))) return;
+    const problem = ruleProblem();
+    if (problem) { setError(problem); if (/customer/.test(problem)) partyRef.current?.focus(); return; }
+    if (!(await feedback.confirm({ title: 'Cash Save?', message: `Collect ${inr(payable)} in cash and save the bill${returnCredit ? ` (after ${inr(creditUse)} return credit ${returnCredit.number})` : ''}${advUse ? ` (after ${inr(advUse)} advance)` : ''}.`, confirmLabel: 'Save cash bill' }))) return;
     await post({ cash: true });
   }
 
@@ -946,7 +1000,8 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
     return true;
   }
 
-  function savePopup(line) {
+  function savePopup(raw) {
+    const line = billDisc !== '' && !raw.saved && !num(raw.disc) ? { ...raw, disc: billDisc } : raw;
     setLines((current) => (current.some((row) => row.id === line.id) ? current.map((row) => (row.id === line.id ? { ...line, saved: true } : row)) : [...current, { ...line, saved: true }]));
     setPopup(null);
     setError('');
@@ -959,8 +1014,17 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
     if (!lines.length) { setError('Add at least one item.'); codeRef.current?.focus(); return; }
     const missing = lines.find((line) => !flatRows(line, dir).length || summary(line, dir).needs);
     if (missing) { setError(`${missing.name}: ${summary(missing, dir).needs || 'enter a quantity'}. Double-click the line to complete it.`); return; }
+    if (num(advIn?.amount) > 0 && !partyId) { setError(`Choose a saved ${partyKind} to record the ${module === 'sales' ? 'advance' : 'payment'}.`); partyRef.current?.focus(); return; }
+    const problem = ruleProblem();
+    if (problem) { setError(problem); if (/customer/.test(problem)) partyRef.current?.focus(); else if (/advance/i.test(problem)) advRef.current?.focus(); return; }
+    if (type === 'order' && rules?.advance === 'prompt' && !(num(advIn?.amount) > 0)) {
+      if (await feedback.confirm({ title: 'Collect advance?', message: 'Do you want to collect advance amount for this Sales Order?', confirmLabel: 'Yes, enter advance', cancelLabel: 'No, save without' })) {
+        if (!partyId) { setError('Choose a saved customer to take an advance.'); partyRef.current?.focus(); } else setTimeout(() => advRef.current?.focus(), 30);
+        return;
+      }
+    }
     if (isBill) { setPaying(true); return; }
-    if (!(await feedback.confirm({ title: `Save ${meta.label}?`, message: `Save this ${meta.label.toLowerCase()} for ${party?.name || partyName || 'Cash Customer'} — ${lines.length} line${lines.length === 1 ? '' : 's'}, total ${inr(totals.grand)}?`, detail: dir > 0 ? 'Stock will be received into the location.' : dir < 0 ? 'Stock will be taken out of the location.' : '', confirmLabel: 'Save' }))) return;
+    if (!(await feedback.confirm({ title: `Save ${meta.label}?`, message: `Save this ${meta.label.toLowerCase()} for ${party?.name || partyName || 'Cash Customer'} — ${lines.length} line${lines.length === 1 ? '' : 's'}, total ${inr(liquorTax ? Math.round(totals.grand - totals.roundOff + liquorTax.amount) : totals.grand)}${liquorTax ? ` (incl. ${liquorTax.label} ${inr(liquorTax.amount)})` : ''}?`, detail: [dir > 0 ? 'Stock will be received into the location.' : dir < 0 ? 'Stock will be taken out of the location.' : '', num(advIn?.amount) > 0 ? `${module === 'sales' ? 'Advance received' : 'Paid now'}: ${inr(advIn.amount)}.` : ''].filter(Boolean).join(' '), confirmLabel: 'Save' }))) return;
     await post();
   }
 
@@ -968,15 +1032,18 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
     setPending(true);
     setError('');
     try {
-      const body = { sourceNumber: src?.number || '', date, partyId, partyName, locationId, registerId, refNo, dueDate, note, inclusive, lines: lines.map(lineWithUnits) };
+      const body = { sourceNumber: src?.number || '', date, partyId, partyName, locationId, registerId, refNo, dueDate, note, inclusive, lines: lines.map(lineWithUnits), liquor };
       if (isBill) {
         body.couponCode = promo.result?.coupon?.ok ? promo.result.coupon.code : '';
         body.payments = options.cash ? [] : payments.map((row) => ({ tenderId: row.tenderId, amount: num(row.amount), ref: row.ref, voucherCode: row.voucherCode }));
         if (returnCredit) body.returnCredit = returnCredit.number;
+        if (advUse > 0) { body.useAdvance = advUse; body.advanceOrder = src?.type === 'order' ? src.number : ''; }
       }
+      if (takesAdvance && num(advIn?.amount) > 0) body[module === 'sales' ? 'advance' : 'paidNow'] = { amount: num(advIn.amount), tenderId: advIn.tenderId, ref: advIn.ref || '' };
       const result = await request(`/documents/${module}/${type}`, { method: 'POST', body });
       const p = result.promotions;
-      const extra = isBill ? [
+      const extra = result.receipt ? `${module === 'sales' ? 'Advance' : 'Payment'} ${result.receipt.number}: ${inr(result.receipt.amount)}` : isBill ? [
+        result.advanceUsed ? `Advance used ${inr(result.advanceUsed)}` : '',
         result.change ? `Return change ${inr(result.change)}` : '',
         result.returnCredit ? `Return credit ${result.returnCredit.number} used ${inr(result.returnCredit.amount)}${result.returnCredit.cashBack ? ` · refund ${inr(result.returnCredit.cashBack)} in cash` : ''}` : '',
         p?.saved ? `Customer saved ${inr(p.saved)}` : '',
@@ -985,10 +1052,18 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
         ...(p?.issued || []).map((row) => `Coupon for next visit: ${row.code} (${row.value} off)`),
       ].filter(Boolean).join(' · ') : '';
       setPaying(false);
-      if (isBill && options.print) {
-        try { const doc = await request(`/documents/${module}/${type}/${encodeURIComponent(result.number)}`); printDocument(doc, session.tenant); } catch { /* print is optional */ }
-      }
+      // print: the Payment window's Save & Print, or Sales Configurations (print automatically / ask Yes-No)
+      const printIt = async () => { try { const doc = await request(`/documents/${module}/${type}/${encodeURIComponent(result.number)}`); if (!printDocument(doc, session.tenant)) feedback.toast('Allow pop-ups for this site to print.', 'error'); } catch { /* print is optional */ } };
+      if ((isBill && options.print) || rules?.print === 'always') await printIt();
       await feedback.success({ title: `${meta.label} saved successfully`, message: `${result.number} · ${inr(result.total)}${result.stockDir > 0 ? ' · stock received' : result.stockDir < 0 ? ' · stock deducted' : ''}`, detail: extra, autoClose: !extra });
+      if (rules?.print === 'ask' && !(isBill && options.print) && await feedback.confirm({ title: `Print ${meta.label.toLowerCase()}?`, message: `Print ${result.number} now?`, confirmLabel: 'Yes, print', cancelLabel: 'No' })) await printIt();
+      if (rules?.afterSave === 'clear') {
+        resetBill(); setBillDisc('');
+        request(`/documents/${module}/${type}/setup`).then((data) => setSetup((cur) => ({ ...(cur || data), nextNumber: data.nextNumber }))).catch(() => {});
+        onSaved(result, { stay: true });
+        setTimeout(() => ((rules.cursor === 'customer' ? partyRef : codeRef).current?.focus()), 60);
+        return;
+      }
       onSaved(result);
     } catch (err) {
       setError(message(err));
@@ -1007,10 +1082,14 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
       <div className="ose-window dc-window" role="dialog" aria-modal="true" aria-label={`Create ${meta.label}`}>
         <header className="ose-top">
           <div className="ose-title">
-            <h2>{src ? `${meta.label} from ${docType(module, src.type)?.label || sourceMeta?.label || ''} ${src.number}` : `Create ${meta.label}`}</h2>
+            <h2>{src ? `${meta.label} from ${docType(module, src.type)?.label || sourceMeta?.label || ''} ${src.number}` : `Create ${meta.label}`}
+              <button type="button" className="dc-focus-sum" title="Show the header details">
+                <b className="mono">{shownNumber}</b><span>{day(date)}</span><span className={module === 'purchase' && !partyId ? 'bad' : ''}>{party?.name || partyName || (module === 'purchase' ? 'Choose the supplier' : 'Cash customer')}</span><span>{(setup?.locations || []).find((row) => row.id === locationId)?.name || ''}</span>{refNo ? <span>{meta.refLabel}: {refNo}</span> : null}<em>Show details ▾</em>
+              </button>
+            </h2>
             <p>Type or scan an item code, or search by name. A window opens for the item type. {effect}</p>
           </div>
-          <button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
+          <MaxButton /><button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
         </header>
         <div className="ose-head dc-head">
           <label style={{ minWidth: `${Math.min(Math.max(String(shownNumber).length * 8.5 + 30, 110), 260)}px` }}>{meta.prefix} No.<input value={shownNumber} readOnly className="mono" title={chosenReg ? `Numbered by counter ${chosenReg.code} – ${chosenReg.name}` : 'Company number series'} /></label>
@@ -1019,7 +1098,6 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
             <span>{PARTY_LABEL[partyKind]}{module === 'purchase' ? ' *' : ''}</span>
             <PartyField parties={setup?.parties || []} label={PARTY_LABEL[partyKind]} partyId={partyId} partyName={partyName} allowFree={module === 'sales'} inputRef={partyRef}
               onChange={(next) => { setPartyId(next.partyId); setPartyName(next.partyName); if (next.partyId !== partyId) { setDueDate(''); if (next.partyId) choosePartyFormula(next.partyId); } }} />
-            {partyId ? <button type="button" className="dc-histlink" data-sc="party-history" onClick={() => setTool('party')} title={`Previous history of this ${PARTY_LABEL[partyKind].toLowerCase()}`}>Previous history ›</button> : null}
           </div>
           <label>Location<select value={locationId} onChange={(event) => changeLocation(event.target.value)}>
             {(setup?.locations || []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
@@ -1032,12 +1110,13 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
           ) : null}
           <label>{meta.refLabel}<input value={refNo} maxLength={60} onChange={(event) => setRefNo(event.target.value)} /></label>
           {meta.dueLabel ? <label>{meta.dueLabel}<input type="date" value={dueDate} min={date} onChange={(event) => setDueDate(event.target.value)} /></label> : null}
-          <label className="dc-check"><input type="checkbox" data-sc="toggle-gst" checked={inclusive} onChange={(event) => setInclusive(event.target.checked)} />Rates include GST</label>
+          <label className="dc-check" data-enter="skip"><input type="checkbox" data-sc="toggle-gst" checked={inclusive} onChange={(event) => setInclusive(event.target.checked)} />Rates include GST</label>
         </div>
         <div className="dc-partybar">
           {party ? (
             <>
-              <span><strong>{party.name}</strong>{party.code ? ` · ${party.code}` : ''}</span>
+              <span className="dc-pname" title={`${party.name}${party.code ? ` · ${party.code}` : ''}`}><strong>{party.name}</strong>{party.code ? ` · ${party.code}` : ''}</span>
+              <button type="button" className="dc-histlink" data-sc="party-history" onClick={() => setTool('party')} title={`Previous history of this ${PARTY_LABEL[partyKind].toLowerCase()}`}>Previous history ›</button>
               <span>GSTIN {party.gstin || 'Unregistered'}</span>
               <span>{stateName(party.stateCode) || 'State not set'}</span>
               <span className={interState ? 'dc-tax inter' : 'dc-tax'}>{interState ? 'Inter-state · IGST' : 'Intra-state · CGST + SGST'}</span>
@@ -1054,9 +1133,12 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
           ) : null}
           <label className="dc-note">Note<input value={note} maxLength={300} placeholder="Optional" onChange={(event) => setNote(event.target.value)} /></label>
         </div>
+        <LiquorDocFields module={module} type={type} dir={dir} value={liquor} onChange={setLiquor} locationId={locationId} date={date} lines={lines} inclusive={inclusive} party={party} onTax={setLiquorTax} />
         <div className="lt-scanrow">
           <ScanBar mode={scanMode} onChange={setScanMode} />
           {scanMsg ? <span key={scanMsg.at} className={scanMsg.ok ? 'lt-scanmsg ok' : 'lt-scanmsg bad'}>{scanMsg.text}</span> : null}
+{rules?.billDiscount ? <label className="dc-billdisc" title={num(rules.maxDiscPct) ? `Up to ${rules.maxDiscPct}%` : 'Applies to every line'}>Bill disc %<input inputMode="decimal" value={billDisc} placeholder="0" onChange={(e) => applyBillDisc(e.target.value.replace(/[^\d.]/g, ''))} onFocus={(e) => e.target.select()} /></label> : null}
+          {advAvail ? <label className={`dc-advance${useAdv ? '' : ' off'}`} title={advAvail.rows.map((r) => `${r.number}${r.orderNumber ? ` (${r.orderNumber})` : ''} ${inr(r.amount)}`).join(', ')}><input type="checkbox" checked={useAdv} onChange={(e) => setUseAdv(e.target.checked)} />Advance {inr(advAvail.total)} available{useAdv && advUse ? ` · using −${inr(advUse)}` : ''}</label> : null}
           {returnCredit ? <span className="dc-credit" title="Exchange credit from a Sales Return">Return credit {returnCredit.number} −{inr(creditUse)}<button type="button" aria-label="Remove return credit" title="Remove (the credit stays open on the Sales Return)" onClick={() => setReturnCredit(null)}>×</button></span> : null}
           {isBill ? (
             <div className="dc-billtools">
@@ -1070,9 +1152,9 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
         <div className="ose-table dc-table" ref={scroller}>
           <table>
             <colgroup>
-              <col style={{ width: 44 }} /><col style={{ width: 170 }} /><col /><col style={{ width: 96 }} /><col style={{ width: 60 }} />
-              <col style={{ width: 80 }} /><col style={{ width: 110 }} /><col style={{ width: 72 }} /><col style={{ width: 70 }} />
-              <col style={{ width: 120 }} /><col style={{ width: 112 }} /><col style={{ width: 128 }} /><col style={{ width: 84 }} />
+              <col style={{ width: 40 }} /><col style={{ width: 128 }} /><col /><col style={{ width: 86 }} /><col style={{ width: 56 }} />
+              <col style={{ width: 70 }} /><col style={{ width: 100 }} /><col style={{ width: 64 }} /><col style={{ width: 58 }} />
+              <col style={{ width: 108 }} /><col style={{ width: 94 }} /><col style={{ width: 116 }} /><col style={{ width: 66 }} />
             </colgroup>
             <thead>
               <tr>
@@ -1126,9 +1208,13 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
             {isBill && plain.grand !== totals.grand ? <span className="dc-saved">Offers <strong>−{inr(plain.grand - totals.grand)}</strong></span> : null}
             <span>Taxable <strong>{inr(totals.taxable)}</strong></span>
             {interState ? <span>IGST <strong>{inr(totals.igst)}</strong></span> : <><span>CGST <strong>{inr(totals.cgst)}</strong></span><span>SGST <strong>{inr(totals.sgst)}</strong></span></>}
-            {totals.roundOff ? <span>Round off <strong>{totals.roundOff > 0 ? '+' : ''}{totals.roundOff.toFixed(2)}</strong></span> : null}
-            <span className="dc-grand">Total <strong>{inr(totals.grand)}</strong></span>
-            {creditUse ? <><span className="dc-saved">Return credit <strong>−{inr(creditUse)}</strong></span><span className="dc-grand dc-pay">To pay <strong>{inr(payable)}</strong></span></> : null}
+            {liquorTax ? <span className="dc-liquor-tax">{liquorTax.label} <strong>{inr(liquorTax.amount)}</strong></span> : null}
+            {totals.roundOff && !liquorTax ? <span>Round off <strong>{totals.roundOff > 0 ? '+' : ''}{totals.roundOff.toFixed(2)}</strong></span> : null}
+            <span className="dc-grand">Total <strong>{inr(liquorTax ? Math.round(totals.grand - totals.roundOff + liquorTax.amount) : totals.grand)}</strong></span>
+            {creditUse ? <span className="dc-saved">Return credit <strong>−{inr(creditUse)}</strong></span> : null}
+            {advUse ? <span className="dc-saved">Advance <strong>−{inr(advUse)}</strong></span> : null}
+            {creditUse || advUse ? <span className="dc-grand dc-pay">To pay <strong>{inr(payable)}</strong></span> : null}
+            {takesAdvance ? <AdvanceField inputRef={advRef} label={module === 'sales' ? 'Advance' : 'Paid now'} value={advIn} onChange={setAdvIn} max={module === 'purchase' ? (liquorTax ? Math.round(totals.grand - totals.roundOff + liquorTax.amount) : totals.grand) : undefined} /> : null}
           </div>
           {error ? <span className="ose-error">{error}</span> : null}
           <div className="dc-actions">
@@ -1140,14 +1226,14 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
         </footer>
       </div>
       {paying ? (
-        <PaymentPopup grand={payable} beforeOffers={plain.grand - creditUse} result={promo.result} context={promo.context} tenders={promo.tenders} partyId={partyId} locationId={locationId}
+        <PaymentPopup grand={payable} beforeOffers={plain.grand - creditUse - advUse} result={promo.result} context={promo.context} tenders={promo.tenders} partyId={partyId} locationId={locationId}
           payments={payments} setPayments={setPayments} coupon={coupon} setCoupon={setCoupon} pending={pending} onSave={post} onClose={() => setPaying(false)} />
       ) : null}
       {tool === 'party' && partyId ? <PartyHistory kind={partyKind} partyId={partyId} onClose={() => setTool('')} /> : null}
       {tool === 'return' ? <ReturnExchangePopup locationId={locationId} registerId={registerId} onClose={() => setTool('')} onDone={returnDone} onUseCredit={(c) => { setTool(''); setReturnCredit(c); feedback.toast(`${c.number}: ${inr(c.amount)} credit added to this bill.`); }} /> : null}
       {tool === 'held' ? <HeldBillsPopup onClose={() => { setTool(''); refreshHeld(); }} onRecall={recallHeld} /> : null}
       {tool === 'order' ? <LoadOrderPopup onClose={() => setTool('')} onPick={loadOrder} /> : null}
-      {Line ? <Line line={{ ...popup.line, productId: popup.line.productId || setup?.items.find((it) => it.key === popup.line.key)?.productId, eans: popup.line.eans?.length ? popup.line.eans : setup?.items.find((it) => it.key === popup.line.key)?.eans || [], categoryId: popup.line.categoryId || setup?.items.find((it) => it.key === popup.line.key)?.categoryId, brandId: popup.line.brandId || setup?.items.find((it) => it.key === popup.line.key)?.brandId }} meta={meta} dir={dir} inclusive={inclusive} locationId={locationId} pickMode={pickMode} formula={formula} party={party || {}} selling={setup?.selling} item={setup?.items.find((it) => it.key === popup.line.key)} onItem={(fresh) => setSetup((cur) => (cur ? { ...cur, items: cur.items.map((it) => (it.key === fresh.key ? fresh : it)) } : cur))} onSave={savePopup} onClose={() => { setPopup(null); setTimeout(() => codeRef.current?.focus(), 30); }} /> : null}
+      {Line ? <Line lockRate={Boolean(rules && !rules.editRates)} line={{ ...popup.line, productId: popup.line.productId || setup?.items.find((it) => it.key === popup.line.key)?.productId, eans: popup.line.eans?.length ? popup.line.eans : setup?.items.find((it) => it.key === popup.line.key)?.eans || [], categoryId: popup.line.categoryId || setup?.items.find((it) => it.key === popup.line.key)?.categoryId, brandId: popup.line.brandId || setup?.items.find((it) => it.key === popup.line.key)?.brandId }} meta={meta} dir={dir} inclusive={inclusive} locationId={locationId} pickMode={pickMode} formula={formula} party={party || {}} selling={setup?.selling} item={setup?.items.find((it) => it.key === popup.line.key)} onItem={(fresh) => setSetup((cur) => (cur ? { ...cur, items: cur.items.map((it) => (it.key === fresh.key ? fresh : it)) } : cur))} onSave={savePopup} onClose={() => { setPopup(null); setTimeout(() => codeRef.current?.focus(), 30); }} /> : null}
     </div>
   );
 }
@@ -1184,11 +1270,11 @@ table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ddd;pad
 .tot{width:320px;margin-left:auto;margin-top:10px}.tot td{border:0;padding:3px 6px}.grand td{font-size:15px;font-weight:700;border-top:2px solid #111}.sign{margin-top:48px;display:flex;justify-content:space-between;color:#555}
 @media print{body{margin:12mm}}</style></head><body>
 <div class="top"><div><h1>${esc(tenant.legalName || tenant.name)}</h1><div>${tenant.gstin ? `GSTIN ${esc(tenant.gstin)} · ` : ''}${esc(stateName(tenant.stateCode))}</div><div>${esc(doc.locationName)}${doc.register ? ` · Counter ${esc(doc.register.code)}` : ''}</div></div>
-<div style="text-align:right"><h2>${esc(meta.label)}${dir < 0 && t.tax ? ' (Tax Invoice)' : ''}</h2><div><b>${esc(doc.number)}</b></div><div>Date ${day(doc.date)}</div>${doc.refNo ? `<div>${esc(meta.refLabel)}: ${esc(doc.refNo)}</div>` : ''}${doc.dueDate ? `<div>${esc(meta.dueLabel)}: ${day(doc.dueDate)}</div>` : ''}${doc.sourceNumber ? `<div>Against ${esc(doc.sourceNumber)}</div>` : ''}</div></div>
+<div style="text-align:right"><h2>${esc(meta.label)}${dir < 0 && t.tax ? ' (Tax Invoice)' : ''}</h2><div><b>${esc(doc.number)}</b></div><div>Date ${day(doc.date)}</div>${doc.refNo ? `<div>${esc(meta.refLabel)}: ${esc(doc.refNo)}</div>` : ''}${doc.dueDate ? `<div>${esc(meta.dueLabel)}: ${day(doc.dueDate)}</div>` : ''}${doc.sourceNumber ? `<div>Against ${esc(doc.sourceNumber)}</div>` : ''}${doc.liquor?.tpNo ? `<div>TP No. ${esc(doc.liquor.tpNo)}${doc.liquor.tpDate ? ` · ${day(doc.liquor.tpDate)}` : ''}</div>` : ''}${doc.liquor?.permitNo ? `<div>Permit No. ${esc(doc.liquor.permitNo)}</div>` : ''}${doc.liquor?.licence ? `<div>Licence ${esc(doc.liquor.licence)}</div>` : ''}</div></div>
 <div class="box"><div><b>${esc(PARTY_LABEL[MODULE_PARTY[doc.module]])}</b><br>${esc(party.name)}${party.address ? `<br>${esc(party.address)}` : ''}${party.gstin ? `<br>GSTIN ${esc(party.gstin)}` : ''}${party.stateCode ? `<br>${esc(stateName(party.stateCode))} (${esc(party.stateCode)})` : ''}${party.mobile ? `<br>Mobile ${esc(party.mobile)}` : ''}</div>
 <div><b>Place of supply</b><br>${esc(stateName(party.stateCode || tenant.stateCode))}<br>${doc.interState ? 'Inter-state (IGST)' : 'Intra-state (CGST + SGST)'}<br>Rates ${doc.inclusive ? 'include' : 'exclude'} GST</div></div>
 <table><thead><tr><th>#</th><th>Item</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Disc</th><th class="r">GST</th><th class="r">Taxable</th><th class="r">Amount</th></tr></thead><tbody>${rows}</tbody></table>
-<table class="tot"><tr><td>Taxable value</td><td class="r">${inr(t.taxable)}</td></tr>${t.discount ? `<tr><td>Discount given</td><td class="r">${inr(t.discount)}</td></tr>` : ''}${t.promo ? `<tr><td>Offers &amp; coupon${doc.inclusive ? '' : ' (pre-GST)'}</td><td class="r">−${inr(t.promo)}</td></tr>` : ''}${tax}${t.roundOff ? `<tr><td>Round off</td><td class="r">${Number(t.roundOff).toFixed(2)}</td></tr>` : ''}<tr class="grand"><td>Total</td><td class="r">${inr(t.grand)}</td></tr></table>
+<table class="tot"><tr><td>Taxable value</td><td class="r">${inr(t.taxable)}</td></tr>${t.discount ? `<tr><td>Discount given</td><td class="r">${inr(t.discount)}</td></tr>` : ''}${t.promo ? `<tr><td>Offers &amp; coupon${doc.inclusive ? '' : ' (pre-GST)'}</td><td class="r">−${inr(t.promo)}</td></tr>` : ''}${tax}${t.liquorTax ? `<tr><td>${esc(t.liquorTax.kind)}${t.liquorTax.form && t.liquorTax.form !== 'none' ? ` (against Form ${esc(t.liquorTax.form)})` : ''} @ ${t.liquorTax.rate === 'mixed' ? 'category rates' : `${esc(t.liquorTax.rate)}%`} on liquor</td><td class="r">${inr(t.liquorTax.amount)}</td></tr>` : ''}${doc.liquor?.vat ? `<tr><td>VAT included in MRP (liquor)</td><td class="r">${inr(doc.liquor.vat)}</td></tr>` : ''}${t.roundOff ? `<tr><td>Round off</td><td class="r">${Number(t.roundOff).toFixed(2)}</td></tr>` : ''}<tr class="grand"><td>Total</td><td class="r">${inr(t.grand)}</td></tr></table>
 ${payBlock(doc)}${doc.note ? `<p><b>Note:</b> ${esc(doc.note)}</p>` : ''}<div class="sign"><span>Prepared by ${esc(doc.userName)}</span><span>For ${esc(tenant.name)}<br><br>Authorised signatory</span></div>
 <script>window.onload=function(){window.print()}</script></body></html>`;
   const win = window.open('', '_blank');
@@ -1328,6 +1414,7 @@ function DocumentView({ module, type, number, onClose, onConvert, onChanged }) {
           {t.slabs.map((slab) => <span key={slab.rate}>GST {slab.rate}% on {inr(slab.taxable)} = <strong>{inr(slab.tax)}</strong></span>)}
           {doc.interState ? <span>IGST <strong>{inr(t.igst)}</strong></span> : <><span>CGST <strong>{inr(t.cgst)}</strong></span><span>SGST <strong>{inr(t.sgst)}</strong></span></>}
           {t.promo ? <span className="dc-saved">Offers <strong>−{inr(t.promo)}</strong></span> : null}
+          {t.liquorTax ? <span>{t.liquorTax.kind}{t.liquorTax.form && t.liquorTax.form !== 'none' ? ` (Form ${t.liquorTax.form})` : ''} {t.liquorTax.rate === 'mixed' ? 'by category' : `${t.liquorTax.rate}%`} <strong>{inr(t.liquorTax.amount)}</strong></span> : null}
           {t.roundOff ? <span>Round off <strong>{t.roundOff.toFixed(2)}</strong></span> : null}
           <span className="dc-grand">Total <strong>{inr(t.grand)}</strong></span>
         </div>
@@ -1362,6 +1449,7 @@ export function DocumentsPage({ module, type }) {
   const [creating, setCreating] = useState(false);
   const [source, setSource] = useState(null);
   const [viewing, setViewing] = useState('');
+  const [returning, setReturning] = useState(false);
   const pageRef = useRef(null);
   useFitHeight(pageRef);
 
@@ -1408,7 +1496,7 @@ export function DocumentsPage({ module, type }) {
                 <option value="all">All</option><option value="pending">Pending (open + partial)</option><option value="open">Open</option><option value="partial">Partially converted</option><option value="done">Fully converted / closed</option>
               </select>
             ) : null}
-            {meta.special ? <span className="dc-muted">Made from Sales Bill → Return / Exchange</span> : <button type="button" className="btn primary" data-sc="new" onClick={() => { setDone(''); setSource(null); setCreating(true); }}>+ Create {meta.label}</button>}
+            {meta.special ? <button type="button" className="btn primary" data-sc="new" onClick={() => { setDone(''); setReturning(true); }}>+ Create {meta.label}</button> : <button type="button" className="btn primary" data-sc="new" onClick={() => { setDone(''); setSource(null); setCreating(true); }}>+ Create {meta.label}</button>}
           </div>
         </div>
         <div className="table-wrap">
@@ -1454,7 +1542,8 @@ export function DocumentsPage({ module, type }) {
           type={type}
           source={source}
           onClose={() => { setCreating(false); setSource(null); }}
-          onSaved={(result) => {
+          onSaved={(result, opts) => {
+            if (opts?.stay) { setDone(`Saved ${result.number}: total ${inr(result.total)}. Ready for the next entry.`); setSource(null); load(); return; }
             setCreating(false);
             setDone(`Saved ${result.number}${source ? ` from ${source.number}` : ''}: ${result.lines} line${result.lines === 1 ? '' : 's'}, total ${inr(result.total)}.${result.stockDir > 0 ? ' Stock received.' : result.stockDir < 0 ? ' Stock deducted.' : ''}`);
             setSource(null);
@@ -1463,6 +1552,14 @@ export function DocumentsPage({ module, type }) {
         />
       ) : null}
       {viewing ? <DocumentView module={module} type={type} number={viewing} onClose={() => setViewing('')} onConvert={convert} onChanged={load} /> : null}
+      {returning ? (
+        <ReturnExchangePopup standalone locationId="" onClose={() => setReturning(false)} onUseCredit={() => {}}
+          onDone={(result) => {
+            setReturning(false);
+            setDone(`Saved ${result.number} against ${result.billNumber}: ${inr(result.amount)} — ${result.mode === 'exchange' ? 'kept as exchange credit (use it in a Sales Bill → Return / Exchange → Use an earlier return credit)' : result.mode === 'account' ? `credited to ${result.partyName}'s account${result.creditNote ? ` (${result.creditNote.number}: cleared ${inr(result.creditNote.settled)}, on account ${inr(result.creditNote.onAccount)})` : ''}` : `refund ${inr(result.amount)} in cash`}. Stock is back in the location.`);
+            load();
+          }} />
+      ) : null}
     </div>
   );
 }
