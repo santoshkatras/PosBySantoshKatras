@@ -3,7 +3,7 @@
 // Table admin_audit_log (no company): at, admin_name, admin_email, action, target_type, target_id,
 // target_name, target_code, summary, changes (JSON [{field,label,group,before,after}]), before_json,
 // after_json (flat field maps), effects (JSON [text]), ip.
-import { FEATURE_KEYS, LOCKED_FEATURES } from '../shared/domain.mjs';
+import { FEATURE_KEYS, LOCKED_FEATURES, companyTypeLabel } from '../shared/domain.mjs';
 import { MODULE_LABELS, featureCatalog, licenceOf, typeRules } from '../shared/licensing.mjs';
 
 export const AUDIT_TABLE = 'admin_audit_log';
@@ -39,6 +39,7 @@ export function companyView(company, packages, mapping = null) {
   const fits = typed.fits;
   const v = {};
   const put = (field, group, label, value) => { v[field] = { group, label, value: value === undefined || value === null || value === '' ? '—' : String(value) }; };
+  put('company_type', 'Company', 'Company type', company.company_type ? companyTypeLabel(company.company_type, company.business_type) : `Not set (${companyTypeLabel('', company.business_type)})`);
   put('package', 'Licence', 'Package', name(company.package || 'professional'));
   put('license_mode', 'Licence', 'Licence type', company.license_mode === 'trial' ? 'Trial' : 'Active (paid)');
   put('expires_at', 'Licence', 'Trial ends', company.license_mode === 'trial' ? day(company.expires_at) : '— (paid)');

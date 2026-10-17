@@ -256,6 +256,12 @@ export function registerAdmin(app, store, { route, fail, bearer }) {
       patch.limit_overrides = JSON.stringify(lim);
     }
     if (b.notes !== undefined) patch.admin_notes = String(b.notes || '').slice(0, 500);
+    let typeChanged = false;
+    if (b.companyType !== undefined && String(b.companyType || '') !== String(company.company_type || '')) {
+      if (b.companyType && !COMPANY_TYPES.some(([id]) => id === b.companyType)) return fail(res, 400, 'INVALID', 'Choose a company type.');
+      patch.company_type = String(b.companyType || '');
+      typeChanged = Boolean(b.companyType);
+    }
     if (b.paidUntil !== undefined) {
       if (b.paidUntil && !/^\d{4}-\d{2}-\d{2}$/.test(b.paidUntil)) return fail(res, 400, 'INVALID', 'Licence valid-till date is not valid.');
       patch.paid_until = b.paidUntil ? new Date(`${b.paidUntil}T23:59:59`).toISOString() : '';
@@ -273,7 +279,23 @@ export function registerAdmin(app, store, { route, fail, bearer }) {
     const forced = FEATURE_KEYS.filter((k) => after.moduleOverrides[k] === true && !before.moduleOverrides[k]);
     if (forced.length) await toggleOn(saved, forced);
     const turnedOn = [...new Set([...fresh, ...forced])];
-    await audit.write(req, { action: 'company.update', admin: req.admin, targetType: 'company', targetId: company.id, targetName: company.name, targetCode: company.company_code || '', before: companyView(company, packages, await readTypeMapping(store)), after: companyView(saved, packages, await readTypeMapping(store)), effects: turnedOn.length ? [`Switched on in the company's settings: ${turnedOn.map((k) => MODULE_LABELS[k] || k).join(', ')}`] : [] });
+    // a new company type: its module switches follow Company Types & Features (as at registration)
+    const typeEffects = [];
+    if (typeChanged) {
+      const map = (await readTypeMapping(store))[saved.company_type];
+      const rows = await store.find('settings', { company_id: saved.id });
+      const on = []; const offList = [];
+      for (const key of FEATURE_KEYS) {
+        if (LOCKED_FEATURES.includes(key)) continue;
+        const want = map.modules[key] ? '1' : '0';
+        const row = rows.find((r) => r.setting_key === key);
+        if (row && String(row.setting_value) === want) continue;
+        if (row) await store.update('settings', row.id, { setting_value: want }); else await store.insert('settings', { company_id: saved.id, setting_key: key, setting_value: want });
+        (want === '1' ? on : offList).push(MODULE_LABELS[key] || key);
+      }
+      typeEffects.push(`Company type set to ${companyTypeLabel(saved.company_type, saved.business_type)}${on.length ? ` · switched on ${on.join(', ')}` : ''}${offList.length ? ` · switched off ${offList.join(', ')}` : ''}`);
+    }
+    await audit.write(req, { action: 'company.update', admin: req.admin, targetType: 'company', targetId: company.id, targetName: company.name, targetCode: company.company_code || '', before: companyView(company, packages, await readTypeMapping(store)), after: companyView(saved, packages, await readTypeMapping(store)), effects: [...typeEffects, ...(turnedOn.length ? [`Switched on in the company's settings: ${turnedOn.map((k) => MODULE_LABELS[k] || k).join(', ')}`] : [])] });
     await reply(res, company.id);
   }));
   // Extend trial: +N days from the later of today / the current trial end; the company goes back on trial

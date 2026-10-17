@@ -85,6 +85,7 @@ function CompanyWindow({ token, company: start, catalog, onClose, onSaved }) {
     moduleOverrides: { ...start.licence.moduleOverrides }, featureOverrides: { ...start.licence.featureOverrides },
     limitOverrides: { locations: start.licence.limitOverrides?.locations || '', users: start.licence.limitOverrides?.users || '' }, notes: start.notes || '',
     paidUntil: start.licence.paidUntil || '', moduleExpiry: { ...(start.licence.moduleExpiry || {}) },
+    companyType: start.companyType || '',
   });
   const [f, setF] = useState(initial);
   const first = useRef(JSON.stringify(initial()));
@@ -101,6 +102,11 @@ function CompanyWindow({ token, company: start, catalog, onClose, onSaved }) {
   const lic = licenceText(company.licence);
   async function call(path, body, method = 'PUT') { return api(path, { method, body, token }); }
   async function save() {
+    if (f.companyType && f.companyType !== (company.companyType || '')) {
+      const label = (catalog.companyTypes || []).find((t) => t.id === f.companyType)?.label || f.companyType;
+      const mods = catalog.modules.filter((m) => !m.locked && catalog.typeMapping?.[f.companyType]?.modules[m.key]).map((m) => m.label);
+      if (!(await feedback.confirm({ title: `Change company type to ${label}?`, message: `${company.name}'s modules are set as mapped for ${label} in Company Types: ${mods.join(', ') || 'none'}. Screens follow that mapping too.`, confirmLabel: 'Change type & save', cancelLabel: 'Keep editing' }))) return;
+    }
     setPending(true); setError('');
     try {
       const out = await call(`/admin/companies/${company.id}`, { ...f, limitOverrides: { locations: Number(f.limitOverrides.locations) || 0, users: Number(f.limitOverrides.users) || 0 } });
@@ -134,7 +140,7 @@ function CompanyWindow({ token, company: start, catalog, onClose, onSaved }) {
     document.addEventListener('keydown', key);
     return () => document.removeEventListener('keydown', key);
   }, []);
-  const typed = typeRules(company, catalog.typeMapping);
+  const typed = typeRules({ ...company, companyType: f.companyType || company.companyType }, catalog.typeMapping);
   const fits = typed.fits;
   // on for the company: package (or this company's switch) and it fits the business type unless forced on
   const modOn = (key) => (typeof f.moduleOverrides[key] === 'boolean' ? f.moduleOverrides[key] : Boolean(pkg.modules[key]) && fits.has(key));
@@ -153,7 +159,8 @@ function CompanyWindow({ token, company: start, catalog, onClose, onSaved }) {
           </div>
           <button type="button" className="ose-x" aria-label="Close" onClick={close}>×</button>
         </header>
-        <div className="ose-head">
+        <div className="ose-head ap-cohead">
+          <label>Company type<select value={f.companyType} onChange={(e) => setF({ ...f, companyType: e.target.value })}>{!company.companyType ? <option value="">Not set ({company.companyTypeLabel})</option> : null}{(catalog.companyTypes || []).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select></label>
           <label>Package<select value={f.package} onChange={(e) => setF({ ...f, package: e.target.value })}>{catalog.packages.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</select></label>
           <label>Licence<select value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="trial">Trial</option><option value="active">Active (paid)</option></select></label>
           {f.mode === 'trial' ? <label>Trial ends<input type="date" value={f.trialEndsAt} onChange={(e) => setF({ ...f, trialEndsAt: e.target.value })} /></label> : (
