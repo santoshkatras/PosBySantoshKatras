@@ -335,7 +335,7 @@ export async function createApp(options = {}) {
 
   app.get('/api/health', route(async (_req, res) => {
     await store.ping();
-    res.json({ status: 'ok', database: store.kind === 'memory' ? 'memory' : 'catalyst' });
+    res.json({ status: 'ok', database: store.kind || 'unknown' }); // memory · sqlite · postgres (Supabase) · catalyst
   }));
 
   app.post('/api/auth/signup', route(async (req, res) => {
