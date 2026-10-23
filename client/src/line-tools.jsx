@@ -182,6 +182,18 @@ export function useStockBarcodeConfig() {
   return config || { enabled: true, outwardPick: 'ask', serialBarcodes: true, scanQty: 1 };
 }
 export function forgetStockBarcodeConfig() { barcodeConfig = null; }
+// Sales Configurations → "Allow to scan serial number in all outward transactions" (on unless switched off)
+let serialScanOn = null; let serialScanAt = 0;
+export function useSerialScan() {
+  const { request } = useAuth();
+  const [on, setOn] = useState(serialScanOn);
+  useEffect(() => {
+    if (serialScanOn !== null && Date.now() - serialScanAt < 60000) return;
+    request('/sales-config/serial-scan').then((data) => { serialScanOn = data.on !== false; serialScanAt = Date.now(); setOn(serialScanOn); }).catch(() => {});
+  }, [request]);
+  return on !== false;
+}
+export function forgetSerialScan() { serialScanOn = null; }
 
 const r3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
 // Oldest first / earliest expiry first, for `qty`.
@@ -218,12 +230,19 @@ export function LotPicker({ variantId, locationId, qty, value = [], onChange, on
     setItems(null); setError('');
     request(`/stock-lots?variantId=${encodeURIComponent(variantId)}&locationId=${encodeURIComponent(locationId)}`).then((data) => setItems(data.items || [])).catch((err) => { setItems([]); setError(message(err)); });
   }, [request, variantId, locationId]);
+  // each picked barcode carries its own selling price / MRP (batch-wise price on bills)
+  const priced = (list) => list.map((row) => { const lot = items?.find((item) => item.barcode === row.barcode); return lot ? { ...row, price: lot.salePrice, mrp: lot.mrp } : row; });
+  const emit = (list) => onChange(priced(list));
   // Not typed by hand yet: follow the line quantity, oldest first.
   useEffect(() => {
     if (!items || touched.current) return;
-    const next = num(qty) > 0 ? autoPick(items, qty) : [];
+    const next = priced(num(qty) > 0 ? autoPick(items, qty) : []);
     if (JSON.stringify(next) !== JSON.stringify(value)) onChange(next);
   }, [items, qty]); // eslint-disable-line react-hooks/exhaustive-deps
+  // barcodes picked before the prices were known (scan, older lines) get them now
+  useEffect(() => {
+    if (items && touched.current && value.some((row) => row.price === undefined && items.some((item) => item.barcode === row.barcode))) onChange(priced(value));
+  }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (items?.length && focus && mode === 'ask') setTimeout(() => { first.current?.focus(); first.current?.select(); }, 40); }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
   if (error) return <p className="ose-error">{error}</p>;
   if (!items) return <p className="ose-note">Loading stock barcodes…</p>;
@@ -236,7 +255,7 @@ export function LotPicker({ variantId, locationId, qty, value = [], onChange, on
     const rest = value.filter((item) => item.barcode !== barcode);
     const next = text === '' || !(amount > 0) ? rest : [...rest, { barcode, qty: r3(amount), raw: text }];
     const ordered = items.map((item) => next.find((row) => row.barcode === item.barcode)).filter(Boolean);
-    onChange(ordered);
+    emit(ordered);
     onQty?.(lotTotal(ordered));
   }
   // Space ticks / unticks a barcode (takes what is still needed, else the whole barcode) · ↑ ↓ / Enter move between barcodes
@@ -277,7 +296,7 @@ export function LotPicker({ variantId, locationId, qty, value = [], onChange, on
             const hit = items.find((lot) => lot.barcode === find.trim());
             if (hit) { setLot(hit.barcode, String(Math.min(num(picked(hit.barcode)) + 1, hit.qty))); setFind(''); }
           }} />
-        <button type="button" className="lt-link" onClick={() => { touched.current = false; const next = autoPick(items, num(qty) > 0 ? qty : 0); onChange(next); }} title={batchItem ? 'Earliest expiry first' : 'Oldest stock first'}>Auto pick</button>
+        <button type="button" className="lt-link" onClick={() => { touched.current = false; const next = autoPick(items, num(qty) > 0 ? qty : 0); emit(next); }} title={batchItem ? 'Earliest expiry first' : 'Oldest stock first'}>Auto pick</button>
         <button type="button" className="lt-link" onClick={() => { touched.current = true; onChange([]); onQty?.(0); }}>Clear</button>
         <ColumnPicker columns={batchItem ? LOT_COLUMNS : LOT_COLUMNS.filter(([id]) => !BATCH_ONLY.includes(id))} cols={cols} />
       </div>
@@ -314,6 +333,12 @@ export function LotPicker({ variantId, locationId, qty, value = [], onChange, on
 // Apply a scanned stock barcode (result of GET /stock-lots/code/:code) to outward lines.
 // Lines look like { key, kind, variants: [{ variantId, qty, lots }], picked: { variantId, ids, codes } }.
 // Returns { lines, ok, text }.
+// typed text that is part of an item code / name (picked from the list) — anything else may be a serial number
+export function matchesItemText(items, code) {
+  const q = String(code || '').trim().toLowerCase();
+  if (!q) return true;
+  return (items || []).some((it) => String(it.name || '').toLowerCase().includes(q) || String(it.code || '').toLowerCase().includes(q) || (it.codes || []).some((c) => String(c).toLowerCase().includes(q)));
+}
 export function scanLotInto(lines, found, item, makeLine, { remove = false, step = 1, label = 'entry' } = {}) {
   const fmt = (v) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 3 }).format(num(v));
   const existing = lines.find((l) => l.key === item.key);

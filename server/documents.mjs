@@ -130,6 +130,7 @@ export function registerDocuments(app, store, deps) {
       today: localDay(),
       formulas: module === 'purchase' ? await readFormulas(req.companyId) : null,
       salesRules: module === 'sales' ? salesRules(await readSalesConfig(req.companyId), type) : null,
+      serialScan: (await readSalesConfig(req.companyId)).serialScan,
       selling: module === 'purchase' ? await readSelling(req.companyId) : null,
     });
   }));
@@ -588,6 +589,10 @@ export function registerDocuments(app, store, deps) {
   }
   app.get('/api/sales-config', auth, allow('sales.view', 'sales'), route(async (req, res) => {
     res.json({ config: await readSalesConfig(req.companyId), canEdit: req.session.user.permissions.includes('settings.manage') });
+  }));
+  // Sales Configurations → "Allow to scan serial number in all outward transactions" (read by every outward screen)
+  app.get('/api/sales-config/serial-scan', auth, route(async (req, res) => {
+    res.json({ on: (await readSalesConfig(req.companyId)).serialScan });
   }));
   app.put('/api/sales-config', auth, allow('settings.manage', 'settings'), route(async (req, res) => {
     const config = normalizeSalesConfig(req.body?.config);

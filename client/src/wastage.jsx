@@ -7,7 +7,7 @@ import { ItemSearch, KIND_LABEL, Popup, decimal, inr, message, num } from './ope
 import { SerialPicker, useSerialFields } from './stock-grids.jsx';
 import { Field, Num } from './promotions.jsx';
 import { DEFAULT_WASTAGE_CONFIG, WASTAGE_TONE, wastageQty, wastageTotals } from '../../shared/wastage.mjs';
-import { LotPicker, ScanBar, lotTotal, scanLotInto, useScanMode, useStockBarcodeConfig } from './line-tools.jsx';
+import { LotPicker, ScanBar, lotTotal, matchesItemText, scanLotInto, useScanMode, useSerialScan, useStockBarcodeConfig } from './line-tools.jsx';
 import { isStockBarcode } from '../../shared/stock-barcode.mjs';
 import './line-tools.css';
 import { defaultUnit, factorOf, lineQtyText, lineWithUnits, openUnit, rowFromBase, rowToBase, swapRate, uomOf } from '../../shared/units.mjs';
@@ -198,6 +198,7 @@ function WastageWindow({ onClose, onSaved }) {
   const [scanMode, setScanMode] = useScanMode();
   const [scanMsg, setScanMsg] = useState(null);
   const barcodeCfg = useStockBarcodeConfig();
+  const serialScan = useSerialScan();
 
   useEffect(() => {
     request('/wastage/setup').then((data) => {
@@ -251,7 +252,8 @@ function WastageWindow({ onClose, onSaved }) {
       flash(true, total > 0 ? `${line.name}: 1 removed.` : `${line.name} removed.`);
       return true;
     }
-    if (!isStockBarcode(code) || barcodeCfg.enabled === false) return false;
+    // a stock barcode, or a serial number (IMEI / Serial No) of a serialised item
+    if (!(isStockBarcode(code) && barcodeCfg.enabled !== false) && !(serialScan && !matchesItemText(setup?.items, code))) return false;
     if (!locationId) { setError('Choose the location first.'); return true; }
     request(`/stock-lots/code/${encodeURIComponent(code)}?locationId=${encodeURIComponent(locationId)}`).then((found) => {
       const it = (setup?.items || []).find((row) => row.variants.some((v) => v.variantId === found.variantId));

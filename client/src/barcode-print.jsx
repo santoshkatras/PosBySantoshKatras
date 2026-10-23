@@ -159,7 +159,9 @@ function LabelPickPopup({ line, item, setup, onSave, onClose }) {
     for (const r of rows) {
       const saved = line.rows.find((row) => (r.lot?.serialId ? row.serialId === r.lot.serialId || (row.serial && row.serial === r.lot.serial1) : r.lot ? row.stockCode === r.lot.barcode && row.variantId === r.base.variantId : !row.stockCode && !row.serial && row.variantId === r.base.variantId));
       lab[r.key] = r.lot?.serialId ? '1' : saved ? String(saved.qty) : String(Math.max(Math.ceil(num(r.stock)), r.lot || (noStock && rows.length === 1) ? 1 : 0) || '');
-      pr[r.key] = { mrp: saved?.mrp ?? r.lot?.mrp ?? r.base.mrp ?? '', salePrice: saved?.salePrice ?? r.lot?.salePrice ?? r.base.salePrice ?? '' };
+      // the stock barcode / batch / serial's own MRP and selling price (what it was purchased with); the item's when it has none
+      const own = (v) => (num(v) > 0 ? v : undefined);
+      pr[r.key] = { mrp: saved?.mrp ?? own(r.lot?.mrp) ?? r.base.mrp ?? '', salePrice: saved?.salePrice ?? own(r.lot?.salePrice) ?? r.base.salePrice ?? '' };
       if (saved && num(saved.qty) > 0) on.add(r.key);
     }
     setLabels(lab); setPrices(pr); setTicked(on);
@@ -511,6 +513,36 @@ export function BarcodePrintPage() {
 
   // every item type → the one label window (stock barcodes / batches / serial numbers, prefilled)
   function openLine(line) { setPopup({ line }); }
+  // Scan a stock barcode or a serial number: that lot / unit is added with its own MRP and selling price.
+  function onScan(item, code) {
+    if (item) { openLine(lineFor(item)); return true; }
+    const text = String(code || '').trim();
+    const q = text.toLowerCase();
+    if (!text || items.some((it) => it.name.toLowerCase().includes(q) || it.code.toLowerCase().includes(q) || (it.codes || []).some((c) => String(c).toLowerCase().includes(q)))) return false;
+    request(`/stock-lots/code/${encodeURIComponent(text)}`).then((found) => {
+      const hit = byVariant.get(found.variantId);
+      if (!hit) { setError(`${text}: the item is not available for labels.`); return; }
+      const { item: it, variant } = hit;
+      const own = (v, fb) => (num(v) > 0 ? v : fb);
+      const base = { variantId: variant.variantId, sku: variant.sku, name: variant.name, barcode: variant.barcode || '', mrp: variant.mrp || '', salePrice: variant.salePrice || '' };
+      setLines((current) => {
+        const line = current.find((l) => l.key === it.key) || { ...newLine(it), rows: [], saved: true };
+        let rows;
+        if (found.kind === 'serial') {
+          if (line.rows.some((r) => r.serialId === found.lot.serialId)) return current;
+          rows = [...line.rows, { ...base, id: rowId(), qty: 1, serial: found.lot.serial1, serialId: found.lot.serialId, stockCode: found.lot.barcode || '', mrp: own(found.lot.mrp, base.mrp), salePrice: own(found.lot.salePrice, base.salePrice), batchNo: '', mfgDate: '', expiryDate: '' }];
+        } else {
+          const same = line.rows.find((r) => r.stockCode === found.barcode);
+          rows = same ? line.rows.map((r) => (r === same ? { ...r, qty: String(num(r.qty) + 1) } : r)) : [...line.rows, lotRow(found.lot, base, 1)];
+        }
+        const next = { ...line, rows, saved: true };
+        return current.some((l) => l.id === line.id) ? current.map((l) => (l.id === line.id ? next : l)) : [...current, next];
+      });
+      setError('');
+      feedback.toast(`${it.name}: ${found.kind === 'serial' ? `S/N ${found.lot.serial1}` : `stock barcode ${found.barcode}`} added · MRP ${inr(own(found.lot.mrp, base.mrp))}`);
+    }).catch((err) => setError(message(err)));
+    return true;
+  }
   function savePopup(line) {
     setLines((current) => (current.some((row) => row.id === line.id) ? current.map((row) => (row.id === line.id ? { ...line, saved: true } : row)) : [...current, { ...line, saved: true }]));
     setPopup(null);
@@ -592,7 +624,7 @@ export function BarcodePrintPage() {
               })}
               <tr className="ose-entry">
                 <td className="ose-n">{lines.length + 1}</td>
-                <td><ItemSearch items={items} field="code" placeholder="Scan / type code" onPick={(item) => openLine(lineFor(item))} inputRef={codeRef} /></td>
+                <td><ItemSearch items={items} field="code" placeholder="Scan code / stock barcode / serial no" onPick={(item) => openLine(lineFor(item))} onScan={onScan} inputRef={codeRef} /></td>
                 <td><ItemSearch items={items} field="name" placeholder="Search item name" onPick={(item) => openLine(lineFor(item))} /></td>
                 <td colSpan={6} className="ose-entry-hint">{lines.length ? 'Add the next item' : 'Pick an item to choose how many labels'}</td>
               </tr>

@@ -222,6 +222,52 @@ function PartyField({ parties, label, partyId, partyName, onChange, allowFree, i
 }
 
 // ============ item pop-ups ============
+// Batch-wise selling price (Sales Configurations → Sales Bill): every stock barcode / batch going out carries
+// the selling price and MRP it came in with. One price → the line takes it; several → one bill line per price.
+const lotPriceKey = (lot) => (num(lot.price) > 0 ? `${num(lot.price)}|${num(lot.mrp)}` : '');
+export function splitByBatchPrice(line) {
+  if (!line || line.kind === 'serial' || factorOf(line.uom) !== 1 || line.rateTyped) return [line];
+  const groups = new Map();
+  for (const v of line.variants || []) for (const lot of v.lots || []) { const key = lotPriceKey(lot); if (!groups.has(key)) groups.set(key, { price: num(lot.price), mrp: num(lot.mrp) }); }
+  const priced = (v, g) => (g.price > 0 ? { ...v, rate: String(g.price), ...(g.mrp > 0 ? { mrp: String(g.mrp) } : {}) } : v);
+  if (groups.size <= 1) {
+    const [g] = groups.values();
+    return [g ? { ...line, variants: line.variants.map((v) => (v.lots?.length ? priced(v, g) : v)) } : line];
+  }
+  const out = [];
+  let i = 0;
+  for (const [key, g] of groups) {
+    const variants = line.variants.map((v) => {
+      const lots = (v.lots || []).filter((lot) => lotPriceKey(lot) === key);
+      if (!lots.length) return i === 0 && !(v.lots || []).length ? v : { ...v, qty: '', lots: [] };
+      return priced({ ...v, qty: String(lotTotal(lots)), lots }, g);
+    });
+    if (variants.some((v) => num(v.qty) > 0)) out.push({ ...line, id: out.length ? `${line.id}b${Date.now().toString(36)}${i}` : line.id, variants, saved: true });
+    i += 1;
+  }
+  return out.length ? out : [line];
+}
+// serial units going out: one line per selling price of the ticked serial numbers
+function splitSerialsByPrice(line, stock) {
+  const groups = new Map();
+  line.picked.ids.forEach((id, i) => {
+    const price = num(stock.find((row) => row.id === id)?.salePrice);
+    const key = price > 0 ? String(price) : '';
+    if (!groups.has(key)) groups.set(key, { price, ids: [], codes: [] });
+    groups.get(key).ids.push(id); groups.get(key).codes.push(line.picked.codes[i]);
+  });
+  if (groups.size <= 1) return [line];
+  let n = 0;
+  return [...groups.values()].map((g) => ({ ...line, id: n++ ? `${line.id}b${Date.now().toString(36)}${n}` : line.id, saved: true, picked: { ...line.picked, ids: g.ids, codes: g.codes, rate: g.price > 0 ? String(g.price) : line.picked.rate } }));
+}
+function BatchPriceNote({ parts, dir, inclusive }) {
+  if (!parts || parts.length < 2) return null;
+  const qtyOf = (l) => (l.kind === 'serial' ? l.picked.ids.length : l.variants.reduce((sum, v) => sum + num(v.qty), 0));
+  const rateOf = (l) => (l.kind === 'serial' ? num(l.picked.rate) : num(l.variants.find((v) => num(v.qty) > 0)?.rate));
+  const total = parts.reduce((sum, l) => sum + lineAmounts(l, dir, inclusive).total, 0);
+  return <p className="dc-batchprice">Batch-wise price: {parts.map((l) => `${qtyText(qtyOf(l))} × ${inr(rateOf(l))}`).join(' + ')} = <b>{inr(total)}</b> — added as {parts.length} bill lines.</p>;
+}
+
 function DiscField({ value, onChange, onKeyDown }) {
   return <label>Discount %<input inputMode="decimal" value={value} onChange={(event) => onChange(decimal(event.target.value))} onKeyDown={onKeyDown} /></label>;
 }
@@ -235,7 +281,7 @@ const marginPct = (sale, landing, gst) => { const ex = num(sale) / (1 + num(gst)
 const INWARD_STD_COLS = [['disc', 'Discount %'], ['landing', 'Landing ₹'], ['mrp', 'MRP ₹'], ['sale', 'Selling ₹'], ['margin', 'Margin %'], ['total', 'Line total'], ['ean', 'UPC / EAN codes']];
 const INWARD_GRID_COLS = [['mrp', 'MRP ₹'], ['sale', 'Selling ₹'], ['landing', 'Landing ₹'], ['margin', 'Margin %'], ['amount', 'Amount ₹'], ['ean', 'Barcode / EAN']];
 
-function QtyPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose, selling, locationId, pickMode = 'ask', lockRate = false }) {
+function QtyPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose, selling, locationId, pickMode = 'ask', lockRate = false, batchPrice = false }) {
   const [unit, setUnit] = useState(() => openUnit(line));
   const f = factorOf(unit);
   const [row, setRow] = useState(() => rowFromBase(line.variants[0], openUnit(line)));
@@ -243,6 +289,7 @@ function QtyPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose,
   const [fx, setFx] = useState(line.fx || null);
   const [error, setError] = useState('');
   const [saleTouched, setSaleTouched] = useState(Boolean(line.saved && line.variants[0]?.salePrice !== ''));
+  const [rateTouched, setRateTouched] = useState(Boolean(line.rateTyped));
   const qtyRef = useRef(null);
   const inward = dir > 0;
   const cols = useColumns('in-std', INWARD_STD_COLS);
@@ -255,9 +302,10 @@ function QtyPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose,
   const baseRow = rowToBase(row, unit);
   useEffect(() => { if (!withBatches) { qtyRef.current?.focus(); qtyRef.current?.select(); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (withBatches) setRow((current) => ({ ...current, qty: String(batchTotal(batches) || ''), batches })); }, [batches, withBatches]);
-  const set = (key) => (event) => { if (key === 'salePrice') setSaleTouched(true); setRow({ ...row, [key]: decimal(event.target.value) }); };
+  const set = (key) => (event) => { if (key === 'salePrice') setSaleTouched(true); if (key === 'rate') setRateTouched(true); setRow({ ...row, [key]: decimal(event.target.value) }); };
   const useFx = Boolean(formula && fx);
   const unitInfo = { uom: uomOf(unit) };
+  const lotPrice = batchPrice && dir < 0 && !rateTouched;
   const draft = useFx ? priceLine({ ...line, ...unitInfo, fx, variants: [baseRow] }, formula, party, dir) : { ...line, ...unitInfo, disc, variants: [baseRow] };
   const amount = lineAmounts(draft, dir, inclusive);
   const priced = draft.variants[0] || baseRow;
@@ -280,8 +328,9 @@ function QtyPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose,
     if (inward && num(row.mrp) > 0 && num(row.salePrice) > num(row.mrp)) { setError('Selling price is above the MRP.'); return; }
     const fill = inward && row.salePrice === '' && suggestion > 0 && selling?.apply !== 'suggest';
     const final = fill ? { ...draft, variants: draft.variants.map((v, i) => (i === 0 ? { ...v, salePrice: String(suggestion) } : v)) } : draft;
-    onSave(lineWithUnits(final));
+    onSave(lineWithUnits(batchPrice && dir < 0 ? { ...final, rateTyped: rateTouched || undefined } : final));
   }
+  const parts = lotPrice && f === 1 && row.lots?.length > 1 ? splitByBatchPrice(lineWithUnits(draft)) : null;
   const enter = (event) => { if (event.key === 'Enter') { event.preventDefault(); save(); } };
   return (
     <Popup
@@ -292,7 +341,7 @@ function QtyPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose,
       onClose={onClose}
       footer={(
         <>
-          {error ? <span className="ose-error">{error}</span> : <span className="ose-hint">Taxable {inr(amount.taxable)} · GST {inr(amount.tax)} · <strong>{inr(amount.total)}</strong> <kbd>Enter</kbd> add · <kbd>Esc</kbd> close</span>}
+          {error ? <span className="ose-error">{error}</span> : parts?.length > 1 ? <span className="ose-hint"><strong>{inr(parts.reduce((sum, l) => sum + lineAmounts(l, dir, inclusive).total, 0))}</strong> in {parts.length} lines (batch-wise price) <kbd>Enter</kbd> add · <kbd>Esc</kbd> close</span> : <span className="ose-hint">Taxable {inr(amount.taxable)} · GST {inr(amount.tax)} · <strong>{inr(amount.total)}</strong> <kbd>Enter</kbd> add · <kbd>Esc</kbd> close</span>}
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
           <button type="button" className="btn primary" onClick={save}>{line.saved ? 'Update line' : `Add to ${meta.label}`}</button>
         </>
@@ -337,14 +386,20 @@ function QtyPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose,
       {dir < 0 && line.child ? <p className="ose-note">Child item — no stock of its own. {line.child.ratio} {line.child.unit || ''} of <b>{line.child.name}</b> ({line.child.sku}) goes out for each 1 sold (oldest stock first).</p> : null}
       {dir < 0 && !line.child ? (
         <LotPicker variantId={row.variantId} locationId={locationId} qty={baseRow.qty} value={row.lots || []} batchItem={Boolean(line.expiry)} mode={pickMode} focus={!num(row.qty)} highlight={line.scanned || ''}
-          onChange={(lots) => setRow((current) => ({ ...current, lots }))} onQty={(total) => setRow((current) => ({ ...current, qty: total ? String(Math.round((total / f) * 10000) / 10000) : '' }))} />
+          onChange={(lots) => setRow((current) => {
+            const next = { ...current, lots };
+            const first = lotPrice ? lots.find((lot) => num(lot.price) > 0) : null;
+            if (first) { next.rate = String(Math.round(num(first.price) * f * 10000) / 10000); if (num(first.mrp) > 0) next.mrp = String(first.mrp); }
+            return next;
+          })} onQty={(total) => setRow((current) => ({ ...current, qty: total ? String(Math.round((total / f) * 10000) / 10000) : '' }))} />
       ) : null}
+      <BatchPriceNote parts={parts} dir={dir} inclusive={inclusive} />
       <p className="ose-note">{dir < 0 ? 'Type the quantity going out against each stock barcode (or type Quantity — the oldest / earliest-expiry stock is picked). ' : ''}{inward ? `Saving receives the stock. The ${useFx ? 'landing cost' : 'purchase rate after discount'} becomes the cost price; MRP and selling price changes update the item master.` : `Rates are ${inclusive ? 'inclusive' : 'exclusive'} of GST.`}</p>
     </Popup>
   );
 }
 
-function GridPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose, selling, locationId, pickMode = 'ask', item, onItem, lockRate = false }) {
+function GridPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose, selling, locationId, pickMode = 'ask', item, onItem, lockRate = false, batchPrice = false }) {
   const { request, can } = useAuth();
   const [unit, setUnit] = useState(() => openUnit(line));
   const f = factorOf(unit);
@@ -377,7 +432,10 @@ function GridPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose
   }
   const draft = useFx ? priceLine({ ...line, uom: uomOf(unit), fx, variants: baseRows }, formula, party, dir) : { ...line, uom: uomOf(unit), disc, variants: baseRows };
   const amount = lineAmounts(draft, dir, inclusive);
-  function set(id, key, value) { setRows(rows.map((row) => (row.variantId === id ? { ...row, [key]: decimal(value) } : row))); }
+  const [rateTouched, setRateTouched] = useState(Boolean(line.rateTyped));
+  const lotPrice = batchPrice && dir < 0 && !rateTouched;
+  function set(id, key, value) { if (key === 'rate') setRateTouched(true); setRows(rows.map((row) => (row.variantId === id ? { ...row, [key]: decimal(value) } : row))); }
+  const parts = lotPrice && f === 1 && rows.some((row) => row.lots?.length) ? splitByBatchPrice(lineWithUnits(draft)) : null;
   function copyDown(key) {
     const first = shown[0];
     if (!first) return;
@@ -408,7 +466,7 @@ function GridPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose
       onSave(lineWithUnits({ ...draft, variants: filled }));
       return;
     }
-    onSave(lineWithUnits(draft));
+    onSave(lineWithUnits(batchPrice && dir < 0 ? { ...draft, rateTyped: rateTouched || undefined } : draft));
   }
   const cols = (useFx
     ? [['qty', f !== 1 ? `Qty (${unit.name})` : 'Qty'], formula.base === 'rate' ? ['basis', 'Supplier Rate ₹'] : ['mrp', 'MRP ₹'], ...(dir > 0 && formula.base === 'rate' ? [['mrp', 'MRP ₹']] : []), ...(dir > 0 ? [['salePrice', 'Selling ₹']] : [])]
@@ -492,9 +550,14 @@ function GridPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose
         const frow = rows.find((row) => row.variantId === focusVariant) || {};
         return (
           <>
+            <BatchPriceNote parts={parts} dir={dir} inclusive={inclusive} />
             <p className="ose-note">Stock barcodes for <b>{frow.sku}</b> — click a variant's Qty cell to choose its stock barcodes.</p>
             <LotPicker key={focusVariant} variantId={focusVariant} locationId={locationId} qty={num(frow.qty) * f || ''} value={frow.lots || []} batchItem={Boolean(line.expiry)} mode={pickMode} highlight={line.scanned || ''}
-              onChange={(lots) => setRows((current) => current.map((row) => (row.variantId === focusVariant ? { ...row, lots } : row)))}
+              onChange={(lots) => setRows((current) => current.map((row) => {
+                if (row.variantId !== focusVariant) return row;
+                const first = lotPrice ? lots.find((lot) => num(lot.price) > 0) : null;
+                return first ? { ...row, lots, rate: String(Math.round(num(first.price) * f * 10000) / 10000), ...(num(first.mrp) > 0 ? { mrp: String(first.mrp) } : {}) } : { ...row, lots };
+              }))}
               onQty={(total) => setRows((current) => current.map((row) => (row.variantId === focusVariant ? { ...row, qty: total ? String(Math.round((total / f) * 10000) / 10000) : '' } : row)))} />
           </>
         );
@@ -577,8 +640,8 @@ function SerialInPopup({ line, meta, dir, inclusive, formula, party, onSave, onC
   );
 }
 
-const SERIAL_OUT_COLS = [['barcode', 'Stock barcode'], ['received', 'Received on'], ...AGE_COLUMNS, ['cost', 'Cost ₹'], ['mrp', 'MRP ₹'], ['sale', 'Selling ₹', false]];
-function SerialOutPopup({ line, meta, dir, inclusive, locationId, onSave, onClose, lockRate = false }) {
+const SERIAL_OUT_COLS = [['barcode', 'Stock barcode'], ['received', 'Received on'], ...AGE_COLUMNS, ['cost', 'Cost ₹'], ['mrp', 'MRP ₹'], ['sale', 'Selling ₹']];
+function SerialOutPopup({ line, meta, dir, inclusive, locationId, onSave, onClose, lockRate = false, batchPrice = false }) {
   const { request } = useAuth();
   const fields = useSerialFields();
   const ocols = useColumns('out-serial', SERIAL_OUT_COLS);
@@ -587,8 +650,16 @@ function SerialOutPopup({ line, meta, dir, inclusive, locationId, onSave, onClos
   const [stock, setStock] = useState(null);
   const [picked, setPicked] = useState(line.picked.ids);
   const [rate, setRate] = useState(String(line.picked.rate ?? variant.salePrice ?? ''));
+  const [rateTouched, setRateTouched] = useState(Boolean(line.rateTyped));
+  const lotPrice = batchPrice && dir < 0 && !rateTouched;
   const [disc, setDisc] = useState(line.disc);
   const [error, setError] = useState('');
+  // batch-wise price: the rate follows the selling price of the serial numbers ticked
+  useEffect(() => {
+    if (!lotPrice || !stock) return;
+    const first = picked.map((id) => stock.find((row) => row.id === id)).find((row) => num(row?.salePrice) > 0);
+    if (first && String(num(first.salePrice)) !== String(num(rate))) setRate(String(num(first.salePrice)));
+  }, [picked, stock]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     setStock(null);
     request(`/documents/serials/${variant.variantId}?locationId=${encodeURIComponent(locationId)}`).then((data) => setStock(data.items)).catch((err) => { setStock([]); setError(message(err)); });
@@ -596,10 +667,12 @@ function SerialOutPopup({ line, meta, dir, inclusive, locationId, onSave, onClos
   const codes = (stock || []).filter((row) => picked.includes(row.id)).map((row) => row.serial1);
   const draft = { ...line, disc, picked: { variantId: variant.variantId, ids: picked, codes, rate } };
   const amount = lineAmounts(draft, dir, inclusive);
+  const parts = lotPrice && stock && picked.length > 1 ? splitSerialsByPrice(draft, stock) : null;
   function save() {
     if (!picked.length) { setError('Tick the serial numbers being sold.'); return; }
     if (!(num(rate) > 0)) { setError('Enter the selling rate.'); return; }
-    onSave(draft);
+    if (parts?.length > 1) { onSave(parts); return; }
+    onSave(batchPrice && dir < 0 ? { ...draft, rateTyped: rateTouched || undefined } : draft);
   }
   return (
     <Popup
@@ -624,9 +697,10 @@ function SerialOutPopup({ line, meta, dir, inclusive, locationId, onSave, onClos
             </select>
           </label>
         ) : null}
-        <label>Rate each ₹<input inputMode="decimal" value={rate} readOnly={lockRate} title={lockRate ? 'Rate editing is switched off in Sales Configurations' : undefined} onChange={(event) => setRate(decimal(event.target.value))} /></label>
+        <label>Rate each ₹<input inputMode="decimal" value={rate} readOnly={lockRate} title={lockRate ? 'Rate editing is switched off in Sales Configurations' : undefined} onChange={(event) => { setRateTouched(true); setRate(decimal(event.target.value)); }} /></label>
         <label>Discount %<input inputMode="decimal" value={disc} onChange={(event) => setDisc(decimal(event.target.value))} /></label>
       </div>
+      <BatchPriceNote parts={parts} dir={dir} inclusive={inclusive} />
       {stock ? (
         <SerialPicker serials={[...stock].sort((a, b) => String(a.receivedAt).localeCompare(String(b.receivedAt)))} picked={picked} onPick={setPicked} fields={fields} height="min(46vh, 420px)"
           tools={<ColumnPicker columns={SERIAL_OUT_COLS} cols={ocols} />}
@@ -738,6 +812,8 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
   const creditUse = returnCredit ? Math.min(num(returnCredit.amount), totals.grand) : 0;
   // Advance: Sales Order advance taken now / Purchase invoice paid now / advance used on a Sales Bill
   const rules = setup?.salesRules || null;
+  // Sales Bill: rate / MRP from the stock barcode or batch going out (Sales Configurations)
+  const batchPrice = module === 'sales' && dir < 0 && meta.rate === 'sale' && (rules ? rules.batchPrice !== false : true);
   const takesAdvance = (module === 'sales' && type === 'order' && rules?.advance !== 'off') || (module === 'purchase' && type === 'invoice');
   const advRef = useRef(null);
   const [billDisc, setBillDisc] = useState('');
@@ -881,29 +957,36 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
     if (dir >= 0) { onScan(item, item.variants.find((v) => v.variantId === found.variantId)?.sku || item.code); return; }
     const step = num(barcodeCfg.scanQty) || 1;
     const vIndex = Math.max(item.variants.findIndex((v) => v.variantId === found.variantId), 0);
+    // batch-wise price: the barcode's own selling price decides which bill line it joins (or starts a new one)
+    const lp = batchPrice ? num(found.lot.salePrice) : 0;
+    const lotMrp = num(found.lot.mrp);
     setLines((current) => {
-      const existing = current.find((l) => l.key === item.key);
+      const sameKey = current.filter((l) => l.key === item.key);
       if (found.kind === 'serial') {
         const serialId = found.lot.serialId;
         if (scanMode === 'remove') {
-          if (!existing?.picked?.ids?.includes(serialId)) { flash(false, `${found.lot.serial1} is not in this ${meta.label}.`); return current; }
+          const existing = sameKey.find((l) => l.picked?.ids?.includes(serialId));
+          if (!existing) { flash(false, `${found.lot.serial1} is not in this ${meta.label}.`); return current; }
           const i = existing.picked.ids.indexOf(serialId);
           const next = { ...existing, picked: { ...existing.picked, ids: existing.picked.ids.filter((_, j) => j !== i), codes: existing.picked.codes.filter((_, j) => j !== i) } };
           flash(true, `S/N ${found.lot.serial1} removed.`);
           return next.picked.ids.length ? current.map((l) => (l.id === existing.id ? next : l)) : current.filter((l) => l.id !== existing.id);
         }
-        if (!(found.qtyHere > 0)) { flash(false, `S/N ${found.lot.serial1} (${code}) is ${found.status === 'in_stock' ? 'at another location' : found.status || 'not in stock'}.`); return current; }
+        if (!(found.qtyHere > 0)) { flash(false, `S/N ${found.lot.serial1} (${code}) is ${found.status === 'in_stock' ? 'at another location' : found.status === 'sold' ? 'already sold' : found.status || 'not in stock'}.`); return current; }
+        if (sameKey.some((l) => l.picked?.ids?.includes(serialId))) { flash(false, `S/N ${found.lot.serial1} is already in this ${meta.label}.`); return current; }
+        const existing = lp > 0 ? sameKey.find((l) => !l.picked?.ids?.length || l.rateTyped || num(l.picked?.rate) === lp) : sameKey[0];
         const base = existing || newLine(item, meta, formula);
-        if (base.picked?.ids?.includes(serialId)) { flash(false, `S/N ${found.lot.serial1} is already in this ${meta.label}.`); return current; }
         const sameVariant = base.picked?.variantId === found.variantId;
-        const picked = { variantId: found.variantId, ids: [...(sameVariant ? base.picked.ids : []), serialId], codes: [...(sameVariant ? base.picked.codes : []), found.lot.serial1], rate: base.picked?.rate || found.lot.salePrice || item.variants[vIndex]?.salePrice || '' };
+        const keepRate = base.rateTyped || (base.picked?.ids?.length && sameVariant);
+        const picked = { variantId: found.variantId, ids: [...(sameVariant ? base.picked.ids : []), serialId], codes: [...(sameVariant ? base.picked.codes : []), found.lot.serial1], rate: (keepRate && base.picked?.rate) || (lp > 0 ? String(lp) : '') || base.picked?.rate || found.lot.salePrice || item.variants[vIndex]?.salePrice || '' };
         const next = { ...base, picked, saved: num(picked.rate) > 0 };
-        flash(true, `${item.name}: S/N ${found.lot.serial1} added (${picked.ids.length}).`);
+        flash(true, `${item.name}: S/N ${found.lot.serial1} added (${picked.ids.length})${lp > 0 ? ` @ ${inr(num(picked.rate))}` : ''}.`);
         if (!(num(picked.rate) > 0)) setTimeout(() => setPopup({ line: next }), 0);
         return existing ? current.map((l) => (l.id === existing.id ? next : l)) : (num(picked.rate) > 0 ? [...current, next] : current);
       }
       // lot of a plain / matrix / batch item
       if (scanMode === 'remove') {
+        const existing = sameKey.find((l) => l.variants.some((v) => (v.lots || []).some((lot) => lot.barcode === code)));
         const row = existing?.variants.find((v) => (v.lots || []).some((lot) => lot.barcode === code));
         if (!row) { flash(false, `Stock barcode ${code} is not in this ${meta.label}.`); return current; }
         const variants = existing.variants.map((v) => (v !== row ? v : { ...v, qty: String(Math.max(num(v.qty) - step, 0) || ''), lots: v.lots.map((lot) => (lot.barcode === code ? { ...lot, qty: Math.max(num(lot.qty) - step, 0), raw: undefined } : lot)).filter((lot) => lot.qty > 0) }));
@@ -912,16 +995,21 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
         return total > 0 ? current.map((l) => (l.id === existing.id ? { ...existing, variants } : l)) : current.filter((l) => l.id !== existing.id);
       }
       if (!(found.qtyHere > 0)) { flash(false, `Stock barcode ${code} has no stock at this location${found.elsewhere?.length ? ` (it is at ${found.elsewhere.length} other location${found.elsewhere.length === 1 ? '' : 's'})` : ''}.`); return current; }
-      const base = existing || newLine(item, meta, formula);
-      const row = base.variants[vIndex];
-      const already = num((row.lots || []).find((lot) => lot.barcode === code)?.qty);
+      const already = sameKey.reduce((sum, l) => sum + l.variants.reduce((t, v) => t + num((v.lots || []).find((lot) => lot.barcode === code)?.qty), 0), 0);
       if (already + step > found.qtyHere + 0.0005) { flash(false, `Stock barcode ${code} has only ${qtyText(found.qtyHere)} — all of it is already in this ${meta.label}.`); return current; }
-      const lotsNow = (row.lots || []).some((lot) => lot.barcode === code) ? row.lots.map((lot) => (lot.barcode === code ? { ...lot, qty: already + step, raw: undefined } : lot)) : [...(row.lots || []), { barcode: code, qty: step }];
+      const existing = lp > 0 && !formula
+        ? sameKey.find((l) => (l.rateTyped || num(l.variants[vIndex]?.rate) === lp || (l.variants[vIndex]?.lots || []).some((lot) => lot.barcode === code)))
+        : sameKey[0];
+      const fresh = newLine(item, meta, formula);
+      const base = existing || (lp > 0 && !formula ? { ...fresh, variants: fresh.variants.map((v, i) => (i === vIndex ? { ...v, rate: String(lp), ...(lotMrp > 0 ? { mrp: String(lotMrp) } : {}) } : v)) } : fresh);
+      const row = base.variants[vIndex];
+      const mine = num((row.lots || []).find((lot) => lot.barcode === code)?.qty);
+      const lotsNow = (row.lots || []).some((lot) => lot.barcode === code) ? row.lots.map((lot) => (lot.barcode === code ? { ...lot, qty: mine + step, raw: undefined } : lot)) : [...(row.lots || []), { barcode: code, qty: step, price: found.lot.salePrice, mrp: found.lot.mrp }];
       const qtyNow = Math.max(num(row.qty), lotTotal(row.lots)) + step;
       const variants = base.variants.map((v, i) => (i === vIndex ? { ...v, qty: String(qtyNow), lots: lotsNow } : v));
       const rate = num(variants[vIndex].rate);
       const next = { ...base, variants, scanned: code, saved: rate > 0 && !formula };
-      flash(true, `${item.name}${item.kind === 'matrix' ? ` (${variants[vIndex].sku})` : ''}: +${step} from ${code} → ${qtyText(qtyNow)}`);
+      flash(true, `${item.name}${item.kind === 'matrix' ? ` (${variants[vIndex].sku})` : ''}: +${step} from ${code} → ${qtyText(qtyNow)}${lp > 0 ? ` @ ${inr(rate)}` : ''}`);
       if (!(rate > 0) || formula) { setTimeout(() => setPopup({ line: next }), 0); return existing ? current.map((l) => (l.id === existing.id ? next : l)) : current; }
       return existing ? current.map((l) => (l.id === existing.id ? next : l)) : [...current, next];
     });
@@ -932,6 +1020,8 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
     const flash = (ok, text) => { setScanMsg({ ok, text, at: Date.now() }); setError(''); };
     const low = String(code || '').toLowerCase();
     if (!item && isStockBarcode(code) && barcodeCfg.enabled !== false) { scanLot(String(code).trim()); return true; }
+    // outward (and Sales Order / Quotation): a scanned serial number (IMEI / Serial No) brings its item with that unit ticked
+    if (!item && dir <= 0 && setup?.serialScan !== false && scanMode !== 'remove' && low.trim() && !(setup?.items || []).some((it) => it.name.toLowerCase().includes(low.trim()) || it.code.toLowerCase().includes(low.trim()) || (it.codes || []).some((c) => String(c).toLowerCase().includes(low.trim())))) { scanLot(String(code).trim()); return true; }
     if (scanMode === 'remove') {
       if (!item) {
         const hit = lines.find((line) => (line.picked?.codes || []).some((c) => String(c).toLowerCase() === low) || (line.serials?.rows || []).some((r) => String(r.serial1).toLowerCase() === low));
@@ -978,6 +1068,17 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
       }).catch(() => setPopup({ line: existing || newLine(item, meta, formula) }));
       return true;
     }
+    // batch-wise price, “auto” pick: the oldest stock barcode still free goes out at its own price
+    if (dir < 0 && batchPrice && item.kind !== 'serial' && !item.child && barcodeCfg.enabled !== false && barcodeCfg.outwardPick === 'auto' && !formula) {
+      const variant = item.variants[Math.max(scannedIndex, 0)];
+      const step = num(barcodeCfg.scanQty) || 1;
+      const used = (bc) => lines.filter((l) => l.key === item.key).reduce((sum, l) => sum + l.variants.reduce((t, v) => t + num((v.lots || []).find((x) => x.barcode === bc)?.qty), 0), 0);
+      request(`/stock-lots?variantId=${encodeURIComponent(variant.variantId)}&locationId=${encodeURIComponent(locationId)}`).then((data) => {
+        const lot = (data.items || []).find((x) => num(x.qty) - used(x.barcode) >= step - 0.0005);
+        if (lot) scanLot(lot.barcode); else setPopup({ line: existing || newLine(item, meta, formula) });
+      }).catch(() => setPopup({ line: existing || newLine(item, meta, formula) }));
+      return true;
+    }
     const quick = item.kind !== 'serial' && !(item.expiry && dir > 0) && !formula;
     if (quick && existing) {
       const vIndex = item.kind === 'matrix' ? Math.max(existing.variants.findIndex((v) => v.variantId === item.variants[Math.max(scannedIndex, 0)]?.variantId), 0) : 0;
@@ -1001,8 +1102,15 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
   }
 
   function savePopup(raw) {
-    const line = billDisc !== '' && !raw.saved && !num(raw.disc) ? { ...raw, disc: billDisc } : raw;
-    setLines((current) => (current.some((row) => row.id === line.id) ? current.map((row) => (row.id === line.id ? { ...line, saved: true } : row)) : [...current, { ...line, saved: true }]));
+    const fresh = !(Array.isArray(raw) ? raw[0] : raw).saved;
+    // batch-wise price: stock at different prices becomes one line per price
+    const list = (Array.isArray(raw) ? raw : [raw]).flatMap((l) => (batchPrice ? splitByBatchPrice(l) : [l])).map((l) => ({ ...(billDisc !== '' && fresh && !num(l.disc) ? { ...l, disc: billDisc } : l), saved: true }));
+    setLines((current) => {
+      const next = [...current];
+      const at = next.findIndex((row) => row.id === list[0].id);
+      if (at >= 0) next.splice(at, 1, ...list); else next.push(...list);
+      return next;
+    });
     setPopup(null);
     setError('');
     setTimeout(() => { codeRef.current?.focus(); if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight; }, 30);
@@ -1233,7 +1341,7 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
       {tool === 'return' ? <ReturnExchangePopup locationId={locationId} registerId={registerId} onClose={() => setTool('')} onDone={returnDone} onUseCredit={(c) => { setTool(''); setReturnCredit(c); feedback.toast(`${c.number}: ${inr(c.amount)} credit added to this bill.`); }} /> : null}
       {tool === 'held' ? <HeldBillsPopup onClose={() => { setTool(''); refreshHeld(); }} onRecall={recallHeld} /> : null}
       {tool === 'order' ? <LoadOrderPopup onClose={() => setTool('')} onPick={loadOrder} /> : null}
-      {Line ? <Line lockRate={Boolean(rules && !rules.editRates)} line={{ ...popup.line, productId: popup.line.productId || setup?.items.find((it) => it.key === popup.line.key)?.productId, eans: popup.line.eans?.length ? popup.line.eans : setup?.items.find((it) => it.key === popup.line.key)?.eans || [], categoryId: popup.line.categoryId || setup?.items.find((it) => it.key === popup.line.key)?.categoryId, brandId: popup.line.brandId || setup?.items.find((it) => it.key === popup.line.key)?.brandId }} meta={meta} dir={dir} inclusive={inclusive} locationId={locationId} pickMode={pickMode} formula={formula} party={party || {}} selling={setup?.selling} item={setup?.items.find((it) => it.key === popup.line.key)} onItem={(fresh) => setSetup((cur) => (cur ? { ...cur, items: cur.items.map((it) => (it.key === fresh.key ? fresh : it)) } : cur))} onSave={savePopup} onClose={() => { setPopup(null); setTimeout(() => codeRef.current?.focus(), 30); }} /> : null}
+      {Line ? <Line lockRate={Boolean(rules && !rules.editRates)} batchPrice={batchPrice} line={{ ...popup.line, productId: popup.line.productId || setup?.items.find((it) => it.key === popup.line.key)?.productId, eans: popup.line.eans?.length ? popup.line.eans : setup?.items.find((it) => it.key === popup.line.key)?.eans || [], categoryId: popup.line.categoryId || setup?.items.find((it) => it.key === popup.line.key)?.categoryId, brandId: popup.line.brandId || setup?.items.find((it) => it.key === popup.line.key)?.brandId }} meta={meta} dir={dir} inclusive={inclusive} locationId={locationId} pickMode={pickMode} formula={formula} party={party || {}} selling={setup?.selling} item={setup?.items.find((it) => it.key === popup.line.key)} onItem={(fresh) => setSetup((cur) => (cur ? { ...cur, items: cur.items.map((it) => (it.key === fresh.key ? fresh : it)) } : cur))} onSave={savePopup} onClose={() => { setPopup(null); setTimeout(() => codeRef.current?.focus(), 30); }} /> : null}
     </div>
   );
 }

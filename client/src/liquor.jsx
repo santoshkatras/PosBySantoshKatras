@@ -30,7 +30,8 @@ export function useLiquorOn() {
 // ============ Sales Bill / Purchase: liquor fields ============
 const stateName = (code) => STATES.find(([c]) => c === String(code))?.[1] || '';
 export function LiquorDocFields({ module, type, dir, value, onChange, locationId, date, lines = [], inclusive = false, party = null, onTax = () => {} }) {
-  const { request } = useAuth();
+  const { request, session } = useAuth();
+  const num = (v) => Number(v) || 0;
   const on = useLiquorOn();
   const [setup, setSetup] = useState(null);
   useEffect(() => { if (on) request('/liquor/setup').then(setSetup).catch(() => setSetup(null)); }, [on, request]);
@@ -45,6 +46,11 @@ export function LiquorDocFields({ module, type, dir, value, onChange, locationId
   if (!sale && !inward) return null;
   const rules = setup?.config?.rules || {};
   const status = setup?.status?.[locationId];
+  // Only for liquor business: a Liquor / Wine Shop company, a location holding a liquor licence, or a liquor item on the entry.
+  // A company running other businesses too (module switched on) does not see the bar for its other locations / items.
+  const groups = setup?.itemGroups || {};
+  const liquorLine = lines.some((l) => (l.kind === 'serial' ? groups[l.picked?.variantId || l.serials?.variantId] : (l.variants || []).some((v) => groups[v.variantId] && num(v.qty) > 0)));
+  if (!setup || !(session?.tenant?.companyType === 'liquor_shop' || (status && !status.noLicence) || liquorLine)) return null;
   const set = (k, v) => onChange({ ...value, [k]: v });
   const dry = status && rules.dryDayLock ? setup.config.dryDays.find((d) => d.date === (date || setup.today) && (!d.locationIds.length || d.locationIds.includes(locationId))) : null;
   if (inward) {

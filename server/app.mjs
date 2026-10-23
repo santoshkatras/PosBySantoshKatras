@@ -2005,6 +2005,16 @@ export async function createApp(options = {}) {
     }
     if (!planned.length) return fail(res, 400, 'INVALID', 'No price was changed. Change at least one MRP, selling or cost price.');
     for (const item of planned) await store.update(item.table, item.row.id, item.next);
+    // batch-wise prices: the stock barcodes / batches of a repriced item still in stock take the new MRP / selling price
+    for (const item of planned.filter((row) => row.table === 'variants')) {
+      const lotPatch = {};
+      if (item.next.mrp !== undefined) lotPatch.mrp = item.next.mrp;
+      if (item.next.sale_price !== undefined) lotPatch.sale_price = item.next.sale_price;
+      if (!Object.keys(lotPatch).length) continue;
+      for (const lot of await store.find('stock_lots', { company_id: req.companyId, variant_id: item.row.id })) {
+        if ((Number(lot.qty) || 0) > 0.0005 && locationAllowed(req.session, lot.location_id)) await store.update('stock_lots', lot.id, lotPatch);
+      }
+    }
     const existing = await store.find('price_updates', { company_id: req.companyId });
     const number = priceUpdateNumber(existing);
     await store.insert('price_updates', {

@@ -7,7 +7,7 @@ import { useFitHeight } from './fit-height.js';
 import { ItemSearch, KIND_LABEL, Popup, decimal, inr, message, num } from './opening-stock.jsx';
 import { SerialPicker, useSerialFields } from './stock-grids.jsx';
 import { TransferFilter, blankFilter, scopeItems } from './transfer-filter.jsx';
-import { LotPicker, ScanBar, lotTotal, scanLotInto, useScanMode, useStockBarcodeConfig } from './line-tools.jsx';
+import { LotPicker, ScanBar, lotTotal, matchesItemText, scanLotInto, useScanMode, useSerialScan, useStockBarcodeConfig } from './line-tools.jsx';
 import { isStockBarcode } from '../../shared/stock-barcode.mjs';
 import './line-tools.css';
 import { defaultUnit, factorOf, fitsUnit, lineQtyText, lineWithUnits, openUnit, rowFromBase, rowToBase, swapRate, uomOf } from '../../shared/units.mjs';
@@ -176,6 +176,7 @@ function TransferWindow({ kind, source, onClose, onSaved }) {
   const [scanMode, setScanMode] = useScanMode();
   const [scanMsg, setScanMsg] = useState(null);
   const barcodeCfg = useStockBarcodeConfig();
+  const serialScan = useSerialScan();
 
   useEffect(() => {
     request('/transfers/setup').then((data) => {
@@ -259,7 +260,8 @@ function TransferWindow({ kind, source, onClose, onSaved }) {
       }
       pick(item); return true;
     }
-    if (!isStockBarcode(code) || barcodeCfg.enabled === false) return false;
+    // a stock barcode, or a serial number (IMEI / Serial No) of a serialised item
+    if (!(isStockBarcode(code) && barcodeCfg.enabled !== false) && !(kind === 'out' && serialScan && !matchesItemText(setup?.items, code))) return false;
     if (!fromId || !toId) { setError('Choose the From and To locations first.'); return true; }
     if (kind !== 'out') {
       request(`/stock-lots/code/${encodeURIComponent(code)}`).then((found) => { const it = (setup?.items || []).find((row) => row.variants.some((v) => v.variantId === found.variantId)); if (it) pick(it); }).catch((err) => setScanMsg({ ok: false, text: message(err), at: Date.now() }));

@@ -275,8 +275,14 @@ export function createLots(store, { qty, money, catalogueMeta, writeSetting }) {
       const total = locationId ? (here ? n(here.qty) : 0) : lots.reduce((sum, row) => sum + n(row.qty), 0);
       return { kind: 'lot', barcode: text, variantId: lots[0].variant_id, productId: lots[0].product_id, lot: shape(shown), qtyHere: total, elsewhere: lots.filter((row) => row !== shown && n(row.qty) > EPS).map((row) => ({ locationId: row.location_id, qty: n(row.qty) })) };
     }
-    const serial = (await store.find('serials', { company_id: req.companyId })).find((row) => String(row.barcode || '') === text);
-    if (serial) return { kind: 'serial', barcode: text, variantId: serial.variant_id, productId: serial.product_id, lot: shapeSerial(serial), qtyHere: serial.status === 'in_stock' && (!locationId || serial.location_id === locationId) ? 1 : 0, status: serial.status, serialLocationId: serial.location_id };
+    const allSerials = await store.find('serials', { company_id: req.companyId });
+    let serial = allSerials.find((row) => String(row.barcode || '') === text);
+    if (!serial) {
+      // the serial number itself (IMEI / Serial No 1 or 2) scanned: in stock here first, then in stock anywhere, then any
+      const same = allSerials.filter((row) => [row.serial1, row.serial2].some((value) => value && String(value).trim().toUpperCase() === text));
+      serial = same.find((row) => row.status === 'in_stock' && (!locationId || row.location_id === locationId)) || same.find((row) => row.status === 'in_stock') || same[same.length - 1];
+    }
+    if (serial) return { kind: 'serial', barcode: serial.barcode || text, scanned: text, variantId: serial.variant_id, productId: serial.product_id, lot: shapeSerial(serial), qtyHere: serial.status === 'in_stock' && (!locationId || serial.location_id === locationId) ? 1 : 0, status: serial.status, serialLocationId: serial.location_id };
     return null;
   }
 
@@ -306,7 +312,7 @@ export function createLots(store, { qty, money, catalogueMeta, writeSetting }) {
     app.get('/api/stock-lots/code/:code', auth, allow('stock.view', 'stock'), route(async (req, res) => {
       const locationId = String(req.query.locationId || '');
       const found = await lookup(req, req.params.code, locationId);
-      if (!found) return fail(res, 404, 'NOT_FOUND', isStockBarcode(req.params.code) ? `Stock barcode ${req.params.code} is not in this company.` : `No item or stock barcode ${req.params.code}.`);
+      if (!found) return fail(res, 404, 'NOT_FOUND', isStockBarcode(req.params.code) ? `Stock barcode ${req.params.code} is not in this company.` : `No item, serial number or stock barcode ${req.params.code}.`);
       res.json(found);
     }));
     // Lots made by one document (for printing labels after a purchase / opening stock).
