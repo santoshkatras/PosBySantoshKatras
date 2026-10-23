@@ -40,6 +40,7 @@ import { WarrantyPage } from './warranty.jsx';
 import { BarBillingPage, LiquorItemsPage, LiquorReportsPage, LiquorSetupPage, OpenBottlesPage } from './liquor.jsx';
 import { UnitConversionPage } from './unit-conversion.jsx';
 import { RepackPage } from './repack.jsx';
+import { KitMappingPage, KitPackingPage } from './kits.jsx';
 import { PrintTemplatesPage } from './print-templates.jsx';
 import { SERIAL_FIELDS, SERIAL_LABELS } from './stock-grids.jsx';
 
@@ -630,6 +631,7 @@ export function SettingsPage() {
   const [labels, setLabels] = useState(DEFAULT_LABELS);
   const [visible, setVisible] = useState(DEFAULT_VISIBLE);
   const [autoCreate, setAutoCreate] = useState(false);
+  const [cartonSupport, setCartonSupport] = useState(false);
   const [serialLabels, setSerialLabels] = useState(SERIAL_LABELS);
   const [serialVisible, setSerialVisible] = useState({ serial1: true, serial2: true, attr1: true, attr2: true, attr3: true });
   const [error, setError] = useState('');
@@ -643,6 +645,7 @@ export function SettingsPage() {
       if (live && data.labels) setLabels({ ...DEFAULT_LABELS, ...data.labels });
       if (live && data.visible) setVisible({ ...DEFAULT_VISIBLE, ...data.visible });
       if (live) setAutoCreate(Boolean(data.autoCreate));
+      if (live) setCartonSupport(Boolean(data.cartonSupport));
       if (live && data.serialLabels) setSerialLabels({ ...SERIAL_LABELS, ...data.serialLabels });
       if (live && data.serialVisible) setSerialVisible((current) => ({ ...current, ...data.serialVisible, serial1: true }));
     }).catch((err) => {
@@ -720,6 +723,16 @@ export function SettingsPage() {
     } finally {
       setPending(false);
     }
+  }
+
+  async function saveItemSettings(event) {
+    event.preventDefault();
+    setPending(true); setError(''); setSaved('');
+    try {
+      const data = await request('/catalogue/labels', { method: 'PATCH', body: { cartonSupport } });
+      setCartonSupport(Boolean(data.cartonSupport));
+      setSaved(data.cartonSupport ? 'Carton support is on: the Item Master shows “Allow Cartoon” and carton sizes.' : 'Carton support is off.');
+    } catch (err) { setError(message(err)); } finally { setPending(false); }
   }
 
   async function toggle(feature, enabled) {
@@ -821,6 +834,20 @@ export function SettingsPage() {
           </form>
         </section>
       ) : null}
+      {section === 'category' ? (
+        <section className="card">
+          <h2>Item settings</h2>
+          <p className="muted">Options shown on the Item Master.</p>
+          <form className="form-grid" onSubmit={saveItemSettings}>
+            <label className="check-row">
+              <input type="checkbox" checked={cartonSupport} disabled={!can('settings.manage')} onChange={(event) => setCartonSupport(event.target.checked)} />
+              Enable cartoon support
+            </label>
+            <p className="muted">Shows “Allow Cartoon” and the carton sizes on the Item Master. The sales windows ask the number of cartons when Sales Configurations → “Enable cartoon column…” is also on.</p>
+            <div className="actions"><button className="btn primary" type="submit" disabled={pending || !can('settings.manage')}>Save item settings</button></div>
+          </form>
+        </section>
+      ) : null}
       {section === 'master' ? <section className="card">
         <h2>Modules</h2>
         <p className="muted">Users and settings stay on. Other modules follow the plan, then this toggle.</p>
@@ -866,6 +893,8 @@ export function MenuPage() {
   if (slug === 'liquor-setup') return <LiquorSetupPage />;
   if (slug === 'unit-conversion') return <UnitConversionPage />;
   if (slug === 'repacking') return <RepackPage />;
+  if (slug === 'kit-mapping') return <KitMappingPage />;
+  if (slug === 'kit-packing') return <KitPackingPage />;
   if (slug === 'print-templates') return <PrintTemplatesPage />;
   if (slug === 'display-settings') return <DisplaySettingsPage />;
   if (slug === 'shortcut-keys') return <ShortcutSettingsPage />;

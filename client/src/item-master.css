@@ -607,3 +607,15 @@
 .im-field > .im-label-row > i { margin-left: 6px; }
 .im-alertcol { text-align: center; width: 120px; }
 .im-alertcol input[type=checkbox] { width: 18px !important; height: 18px !important; accent-color: #2563eb; }
+
+/* Item Description: Generate / Refresh */
+.im-desc-tools{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.im-desc-tools .im-btn{padding:6px 12px;font-size:13px}
+.im-desc-tools .im-icon{padding:6px 8px;display:inline-flex}
+.im-desc-tools .im-icon svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.im-desc-tools .im-btn:disabled{opacity:.5;cursor:not-allowed}
+.im-desc-tools small{color:#98a2b3;font-size:12px}
+/* Allow Cartoon */
+.im-carton{display:grid;gap:6px;align-content:start}
+.im-carton .im-check{display:flex;align-items:center;gap:8px;font-weight:600;color:#344054;cursor:pointer}
+.im-carton .im-check input{width:16px;height:16px}

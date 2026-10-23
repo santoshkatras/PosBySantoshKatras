@@ -18,6 +18,7 @@ const SOURCES = [
   ['invoice', 'From Purchase Invoice'],
   ['opening', 'From Opening Stock'],
   ['price', 'From Price Update'],
+  ['kit', 'From KIT/Combo Packing'],
 ];
 
 export const TEMPLATES = [
@@ -101,7 +102,7 @@ function labelsOf(line) {
 }
 
 const qtyLabel = (value) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 3 }).format(num(value));
-const SOURCE_LABEL = { purchase: 'Purchase', opening: 'Opening stock', repack: 'Repacking', transfer: 'Transfer in', transfer_in: 'Transfer in', sale_return: 'Sales return', return: 'Sales return', bill: 'Sales return', balance: 'Existing stock', adjustment: 'Stock update', correction: 'Stock update', found: 'Stock found', 'Item creation': 'Item creation' };
+const SOURCE_LABEL = { purchase: 'Purchase', opening: 'Opening stock', repack: 'Repacking', kit: 'KIT/Combo packing', transfer: 'Transfer in', transfer_in: 'Transfer in', sale_return: 'Sales return', return: 'Sales return', bill: 'Sales return', balance: 'Existing stock', adjustment: 'Stock update', correction: 'Stock update', found: 'Stock found', 'Item creation': 'Item creation' };
 const sourceLabel = (lot) => SOURCE_LABEL[lot.sourceType] || (lot.sourceType ? lot.sourceType.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) : 'Stock');
 const shortDay = (value) => (value ? new Date(String(value).length > 10 ? value : `${value}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
 
@@ -381,7 +382,7 @@ export function BarcodePrintPage() {
   useEffect(() => {
     setDocs([]); setDocNo('');
     if (source === 'direct') return;
-    const path = source === 'receipt' ? '/documents/purchase/receipt' : source === 'invoice' ? '/documents/purchase/invoice' : source === 'opening' ? '/stock/opening-entries' : '/price-updates';
+    const path = source === 'receipt' ? '/documents/purchase/receipt' : source === 'invoice' ? '/documents/purchase/invoice' : source === 'opening' ? '/stock/opening-entries' : source === 'kit' ? '/kits/packs' : '/price-updates';
     request(path).then((data) => setDocs(data.items.map((row) => ({
       number: row.number,
       text: `${row.number} · ${new Date(row.date ? `${row.date}T00:00:00` : row.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}${row.partyName ? ` · ${row.partyName}` : row.locationName ? ` · ${row.locationName}` : ''}${row.qty || row.totalQty ? ` · ${num(row.qty || row.totalQty)} qty` : row.items ? ` · ${row.items} items` : ''}`,
@@ -466,6 +467,14 @@ export function BarcodePrintPage() {
             if (row.batches?.length) for (const batch of row.batches) add(row.variantId, { ...prices, qty: batch.qty, batchNo: batch.batchNo, mfgDate: batch.mfgDate, expiryDate: batch.expiryDate });
             else add(row.variantId, { ...prices, qty: num(row.qty) });
           }
+        }
+      } else if (source === 'kit') {
+        const doc = await request(`/kits/packs/${encodeURIComponent(docNo)}`);
+        for (const line of doc.lines || []) {
+          const prices = { mrp: line.mrp || undefined, salePrice: line.salePrice || undefined };
+          const batched = (line.lotsIn || []).filter((x) => x.batchNo);
+          if (batched.length) for (const x of batched) add(line.kit.variantId, { ...prices, qty: num(x.qty), batchNo: x.batchNo, mfgDate: x.mfgDate, expiryDate: x.expiryDate });
+          else add(line.kit.variantId, { ...prices, qty: num(line.qty) });
         }
       } else if (source === 'opening') {
         const doc = await request(`/stock/opening-entries/${encodeURIComponent(docNo)}`);
@@ -582,7 +591,7 @@ export function BarcodePrintPage() {
           <div><h2>Print Barcodes</h2><p>Pick the source, add items in the item table (a window opens for each item type), set the label and print.</p></div>
         </header>
         <div className="bp-sources" role="tablist">
-          {SOURCES.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={source === id} className={source === id ? 'on' : ''} onClick={() => setSource(id)}>{label}</button>)}
+          {SOURCES.filter(([id]) => id !== 'kit' || !(session?.disabledFeatures || []).includes('kit-packing')).map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={source === id} className={source === id ? 'on' : ''} onClick={() => setSource(id)}>{label}</button>)}
         </div>
         {source !== 'direct' ? (
           <div className="bp-docbar">

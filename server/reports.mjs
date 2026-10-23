@@ -16,7 +16,7 @@ const localDay = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTi
 const todayStr = () => localDay(new Date().toISOString());
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthLabel = (d) => `${MONTHS[Number(String(d).slice(5, 7)) - 1] || ''} ${String(d).slice(0, 4)}`;
-const MOVE_LABEL = { opening: 'Opening', purchase: 'Purchase', sale: 'Sale', sale_return: 'Sales return', transfer: 'Transfer', transfer_return: 'Transfer return', wastage: 'Wastage', repack: 'Repacking', damage: 'Damage', loss: 'Loss', found: 'Found', internal_use: 'Internal use', correction: 'Correction', bar_open: 'Bar bottle opened', warranty_replacement: 'Warranty replacement' };
+const MOVE_LABEL = { opening: 'Opening', purchase: 'Purchase', sale: 'Sale', sale_return: 'Sales return', transfer: 'Transfer', transfer_return: 'Transfer return', wastage: 'Wastage', repack: 'Repacking', kit: 'KIT/Combo packing', damage: 'Damage', loss: 'Loss', found: 'Found', internal_use: 'Internal use', correction: 'Correction', bar_open: 'Bar bottle opened', warranty_replacement: 'Warranty replacement' };
 
 export const REPORTS = {
   masters: [

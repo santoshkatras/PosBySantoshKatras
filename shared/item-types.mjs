@@ -12,7 +12,16 @@ export const ITEM_TYPES = [
   { id: 'service', label: 'Service Item', hint: 'Labour, installation, AMC — no stock is kept', kind: 'grocery', service: true },
   { id: 'nonstock', label: 'Non-stock Item', hint: 'Sold or bought without keeping stock (carry bags, freight)', kind: 'grocery', service: true },
   { id: 'consumable', label: 'Consumable / Raw Material', hint: 'Used up in service or production; stock is kept', kind: 'grocery' },
+  { id: 'kit', label: 'KIT/Combo Product', hint: 'Packed from other items — map them in Inventory → KIT/Combo Mapping, pack in KIT/Combo Packing', kind: 'grocery' },
 ];
+
+// Carton (Item Master → “Allow Cartoon”, when Main Category Setups → “Enable cartoon support” is on).
+// sizes: labels such as 5x5x5x5 or 40x30x25 cm — shown in the Carton column; quantity stays separate.
+export function cleanCarton(raw) {
+  const sizes = (Array.isArray(raw?.sizes) ? raw.sizes : String(raw?.sizes || '').split(/[,\n]/))
+    .map((s) => String(s ?? '').trim().replace(/\s+/g, ' ').slice(0, 40)).filter(Boolean);
+  return { allow: Boolean(raw?.allow), sizes: [...new Set(sizes)].slice(0, 10) };
+}
 
 export const typeOf = (id) => ITEM_TYPES.find((t) => t.id === id) || ITEM_TYPES[0];
 export const isStockless = (id) => Boolean(typeOf(id).service);

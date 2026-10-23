@@ -96,6 +96,11 @@ export function SalesConfigPage() {
           <h3>Serial numbers</h3>
           <Switch checked={config.serialScan !== false} onChange={(v) => setConfig({ ...config, serialScan: v })} label="Allow to scan serial number in all outward transactions" hint={config.serialScan !== false ? 'Scanning an IMEI / serial number in Sales Bill, Sales Order, Quotation, Transfer Out and Wastage brings its item with that unit ticked. Applies to every outward screen, not only sales.' : 'Serial numbers are ticked in the item window; scanning an IMEI / serial number in the item code box is not looked up.'} />
         </section>
+        <section className="cfg-block">
+          <h3>Cartons</h3>
+          <Switch checked={config.carton === true} onChange={(v) => setConfig({ ...config, carton: v })} label="Enable cartoon column and show cartoon window for the related products only." hint={config.carton ? 'Sales Bill, Sales Order and Quotation show a Carton column. For an item with “Allow Cartoon” ticked in the Item Master, its window asks the number of cartons (and the carton size); other items are not asked.' : 'No Carton column and no carton question in the sales windows.'} />
+          <p className="cfg-hint">Needs Main Category Setups → “Enable cartoon support”, and “Allow Cartoon” with the carton sizes on the item.</p>
+        </section>
         {tab === 'bill' ? <WindowRules title="A Sales Bill" doc="bill" value={config.bill} onChange={(bill) => setConfig({ ...config, bill })} /> : (
           <>
             <section className="cfg-block">

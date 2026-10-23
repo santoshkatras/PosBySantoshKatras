@@ -9,7 +9,7 @@ import { SerialGrid, blankSerial, serialFieldList } from './stock-grids.jsx';
 import { useFeedback } from './feedback.jsx';
 import { EXPIRY_FORMATS, SHELF_LIFE_TYPES, blankExpiry, calcExpiry, formatExpiry, shelfLifeText } from '../../shared/expiry.mjs';
 import { PERIOD_UNITS, WARRANTY_PROVIDERS, WARRANTY_START, addPeriod, blankWarranty, cleanWarranty, warrantyProblem, warrantySummary } from '../../shared/warranty.mjs';
-import { BATCH_PATTERNS, ITEM_TYPES, cleanBatchRule, makeBatchNo, typeFromItem, typeOf } from '../../shared/item-types.mjs';
+import { BATCH_PATTERNS, ITEM_TYPES, cleanBatchRule, cleanCarton, makeBatchNo, typeFromItem, typeOf } from '../../shared/item-types.mjs';
 
 const TABS = [
   ['basic', 'Basic Details'],
@@ -41,6 +41,7 @@ function blank(unitId = '') {
     parentQty: '1',
     reorderAlert: true,
     bulkOf: { productId: '', qty: '' },
+    carton: { allow: false, sizes: '' },
     stockLevels: {},
     batch: cleanBatchRule({}),
     kind: 'grocery',
@@ -102,6 +103,7 @@ export function ItemMaster({ onClose, onSaved, editId = '' }) {
   const [labels, setLabels] = useState(Object.fromEntries(CATEGORY_LEVELS.map((level) => [level, `Category ${level}`])));
   const [visible, setVisible] = useState(Object.fromEntries(CATEGORY_LEVELS.map((level) => [level, Number(level) <= 5])));
   const [autoCreate, setAutoCreate] = useState(false);
+  const [cartonSupport, setCartonSupport] = useState(false);
   const [units, setUnits] = useState([]);
   const [brands, setBrands] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -137,6 +139,7 @@ export function ItemMaster({ onClose, onSaved, editId = '' }) {
       if (labelData.labels) setLabels((current) => ({ ...current, ...labelData.labels }));
       if (labelData.visible) setVisible((current) => ({ ...current, ...labelData.visible }));
       setAutoCreate(Boolean(labelData.autoCreate));
+      setCartonSupport(Boolean(labelData.cartonSupport));
       setSerialFields(serialFieldList(labelData));
       setDraft((current) => ({ ...current, unitId: current.unitId || defaultUnit(unitData.items) }));
     }).catch((err) => {
@@ -242,6 +245,7 @@ export function ItemMaster({ onClose, onSaved, editId = '' }) {
       parentQty: String(item.profile.parentQty || '1'),
       reorderAlert: item.profile.reorderAlert !== false,
       bulkOf: { productId: item.profile.bulkOf?.productId || '', qty: item.profile.bulkOf?.qty || '' },
+      carton: { allow: Boolean(item.profile.carton?.allow), sizes: (item.profile.carton?.sizes || []).join(', ') },
       stockLevels: item.profile.stockLevels || {},
       batch: cleanBatchRule(item.profile.batch || {}),
       trackSerial: item.trackingType === 'serial',
@@ -475,7 +479,8 @@ export function ItemMaster({ onClose, onSaved, editId = '' }) {
     if (draft.trackSerial && warrantyProblem(cleanWarranty(draft.warranty))) { setError(warrantyProblem(cleanWarranty(draft.warranty))); setPending(false); return; }
     if (draft.ptype === 'child' && !draft.parentId) { setError('Child Item: choose its parent item.'); setTab('basic'); setPending(false); return; }
     if (draft.ptype === 'repack' && (!draft.bulkOf.productId || !(Number(draft.bulkOf.qty) > 0))) { setError('Repackaged Item: choose the bulk item and how much one pack uses.'); setTab('basic'); setPending(false); return; }
-    const typeFields = { itemType: draft.ptype, parentId: draft.parentId, parentQty: draft.parentQty, reorderAlert: draft.reorderAlert, bulkOf: draft.bulkOf, stockLevels: draft.stockLevels, batch: draft.batch };
+    if (cartonSupport && draft.carton?.allow && !cleanCarton(draft.carton).sizes.length) { setError('Allow Cartoon: enter at least one carton size (e.g. 5x5x5x5).'); setTab('basic'); setPending(false); return; }
+    const typeFields = { itemType: draft.ptype, parentId: draft.parentId, parentQty: draft.parentQty, reorderAlert: draft.reorderAlert, bulkOf: draft.bulkOf, stockLevels: draft.stockLevels, batch: draft.batch, ...(cartonSupport ? { carton: cleanCarton(draft.carton) } : {}) };
     try {
       if (editId) {
         if (!(await feedback.confirm({ title: 'Save changes to this item?', message: `${draft.name} · ${draft.sku}`, detail: 'Prices you change apply to new bills and documents from now on.', confirmLabel: 'Save changes' }))) { setPending(false); return; }
@@ -693,8 +698,24 @@ export function ItemMaster({ onClose, onSaved, editId = '' }) {
                   </div>
                 </Field>
                 <Field label="HSN Code" fetched={isFetched('hsnSac')}><input value={draft.hsnSac} onChange={(event) => set({ hsnSac: event.target.value })} /></Field>
+                {cartonSupport ? (
+                  <div className="im-field im-carton">
+                    <span>Cartons</span>
+                    <label className="im-check"><input type="checkbox" checked={Boolean(draft.carton?.allow)} onChange={(event) => set({ carton: { ...draft.carton, allow: event.target.checked } })} /> Allow Cartoon</label>
+                    {draft.carton?.allow ? <input placeholder="Carton sizes, e.g. 5x5x5x5, 10x10" value={draft.carton.sizes} onChange={(event) => set({ carton: { ...draft.carton, sizes: event.target.value } })} /> : null}
+                    <small className="im-type-hint">{draft.carton?.allow ? 'Carton size labels, separated by commas. Sales windows ask the number of cartons for this item and show it in the Carton column.' : 'Tick to sell this item in cartons.'}</small>
+                  </div>
+                ) : null}
               </div>
+              {draft.ptype === 'kit' ? <p className="im-lookup found">KIT/Combo Product: after saving, map the items it is made of in Inventory → KIT/Combo Mapping, then pack kits in KIT/Combo Packing (the mapped items’ stock goes down, the kits come in with stock barcodes).</p> : null}
               <div className="im-desc">
+                <div className="im-desc-tools">
+                  <button type="button" className="im-btn" disabled={!draft.name.trim()} title={draft.name.trim() ? 'Write the description from the item name, brand, categories, unit, prices and settings' : 'Enter the item name first'} onClick={() => set({ notes: describeItem(draft, { categories, units, labels, visible }) })}>Generate description</button>
+                  <button type="button" className="im-btn im-icon" disabled={!draft.name.trim() || !draft.notes} aria-label="Refresh description" title={draft.name.trim() ? 'Refresh the description with the latest details' : 'Enter the item name first'} onClick={() => set({ notes: describeItem(draft, { categories, units, labels, visible }) })}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4" /></svg>
+                  </button>
+                  {!draft.name.trim() ? <small>Enter the item name to generate a description.</small> : null}
+                </div>
                 <Field label="Item Description">
                   <textarea maxLength={500} rows={4} placeholder="Add any notes or description about the item…" value={draft.notes} onChange={(event) => set({ notes: event.target.value })} />
                   <small className="im-count">{draft.notes.length}/500</small>
@@ -1062,6 +1083,39 @@ function ConfigBody({ draft, set, side, setExpiry, stockless = false, stocklessN
 function defaultUnit(units) {
   const list = units || [];
   return (list.find((u) => /^(pcs|pc|piece|pieces)$/i.test(String(u.code || '')) || /^piece/i.test(String(u.name || ''))) || list.find((u) => /^nos$/i.test(String(u.code || ''))) || list[0])?.id || '';
+}
+
+// Item Description from what is filled on the form (Generate / Refresh buttons; needs the item name).
+function describeItem(d, { categories = [], units = [], labels = {}, visible = {} }) {
+  const name = String(d.name || '').trim();
+  if (!name) return d.notes || '';
+  const fmt = (v) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(Number(v) || 0);
+  const namesOf = (level) => {
+    const raw = d.slots?.[level];
+    const ids = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    return ids.map((id) => categories.find((c) => c.id === id)?.name || (String(id).startsWith('new:') ? String(id).slice(4) : '')).filter(Boolean);
+  };
+  const levels = CATEGORY_LEVELS.filter((level) => level === '1' || visible[level]);
+  const cats = levels.map((level) => ({ label: level === '1' ? 'Item Type' : labels[level] || `Category ${level}`, names: namesOf(level) })).filter((c) => c.names.length);
+  const unit = units.find((u) => u.id === d.unitId);
+  const type = typeOf(d.ptype);
+  const parts = [];
+  parts.push(`${name}${d.brandName ? ` by ${d.brandName}` : ''}${cats[0] ? ` — ${cats[0].names.join(', ')}` : ''}.`);
+  const more = cats.slice(1).map((c) => `${c.label}: ${c.names.join(', ')}`);
+  if (more.length) parts.push(`${more.join('; ')}.`);
+  if (d.ptype && d.ptype !== 'standard') parts.push(`${type.label}.`);
+  if (d.kind === 'matrix' && (d.matrix || []).length) parts.push(`Available in ${d.matrix.length} variant${d.matrix.length === 1 ? '' : 's'}.`);
+  if (unit) parts.push(`Sold per ${unit.name.toLowerCase()}.`);
+  const price = [Number(d.mrp) > 0 ? `MRP ₹${fmt(d.mrp)}` : '', Number(d.salePrice) > 0 ? `selling price ₹${fmt(d.salePrice)}` : ''].filter(Boolean);
+  if (price.length) parts.push(`${price.join(', ')}.`.replace(/^./, (c) => c.toUpperCase()));
+  const tax = [d.hsnSac ? `HSN ${d.hsnSac}` : '', d.gstRate !== '' && d.gstRate != null ? `GST ${d.gstRate}%` : ''].filter(Boolean);
+  if (tax.length) parts.push(`${tax.join(', ')}.`);
+  if (d.expiry?.enabled) parts.push(`${shelfLifeText(d.expiry)}.`);
+  if (d.warranty?.enabled && d.warranty.warranty?.on && d.warranty.warranty.value) parts.push(`${d.warranty.warranty.value} ${d.warranty.warranty.unit || 'months'} warranty.`);
+  if (d.trackSerial || d.kind === 'electronics') parts.push('Each unit has its own serial number.');
+  if (d.carton?.allow && String(d.carton.sizes || '').trim()) parts.push(`Packed in cartons (${String(d.carton.sizes).trim()}).`);
+  if (d.upc) parts.push(`UPC/EAN ${d.upc}.`);
+  return parts.join(' ').replace(/\s+/g, ' ').slice(0, 500);
 }
 
 function categoryOptions(categories, level) {

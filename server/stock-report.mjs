@@ -22,10 +22,10 @@ export function bucketOf(row) {
   if (type === 'sale' || reason === 'sale') return 'sale';
   if (type === 'transfer') return q >= 0 ? 'transferIn' : 'transferOut';
   if (type === 'wastage' || reason === 'wastage') return 'wastage';
-  if (type === 'repack' || reason === 'repack') return 'repack';
+  if (type === 'repack' || reason === 'repack' || type === 'kit' || reason === 'kit') return 'repack';
   return 'adjustment';
 }
-const BUCKET_LABEL = { openingEntry: 'Opening stock entry', purchase: 'Purchase', saleReturn: 'Sales return', sale: 'Sale', transferIn: 'Transfer in', transferOut: 'Transfer out', wastage: 'Wastage', repack: 'Repacking', adjustment: 'Adjustment / correction' };
+const BUCKET_LABEL = { openingEntry: 'Opening stock entry', purchase: 'Purchase', saleReturn: 'Sales return', sale: 'Sale', transferIn: 'Transfer in', transferOut: 'Transfer out', wastage: 'Wastage', repack: 'Repacking / KIT packing', adjustment: 'Adjustment / correction' };
 
 // measure id → { label, kind: 'qty'|'value', buckets?: which movement buckets a drill-down shows }
 export const MEASURES = [
@@ -41,7 +41,7 @@ export const MEASURES = [
   { id: 'transferIn', label: 'Transfer In Qty', kind: 'qty', buckets: ['transferIn'] },
   { id: 'transferOut', label: 'Transfer Out Qty', kind: 'qty', buckets: ['transferOut'] },
   { id: 'wastage', label: 'Wastage Qty', kind: 'qty', buckets: ['wastage'] },
-  { id: 'repack', label: 'Repacking Qty (net: packs in, bulk out)', kind: 'qty', buckets: ['repack'] },
+  { id: 'repack', label: 'Repacking / KIT packing Qty (net: packs in, parts out)', kind: 'qty', buckets: ['repack'] },
   { id: 'adjustment', label: 'Adjustment Qty (net)', kind: 'qty', buckets: ['adjustment'] },
   { id: 'closingCost', label: 'Closing Value @ Cost ₹', kind: 'value' },
   { id: 'closingSale', label: 'Closing Value @ Selling Price ₹', kind: 'value' },
@@ -174,6 +174,7 @@ export function registerStockReport(app, store, { auth, allow, route, fail, cata
     const repacks = await store.find('repack_entries', { company_id: req.companyId });
     const docByNumber = new Map();
     for (const row of repacks) docByNumber.set(row.number, { party: '', data: row.data, table: 'repack', date: row.doc_date });
+    for (const row of await store.find('kit_packs', { company_id: req.companyId })) docByNumber.set(row.number, { party: '', data: row.data, table: 'kit', date: row.doc_date });
     for (const row of docs) docByNumber.set(row.number, { party: row.party_name || '', data: row.data, table: 'documents', date: row.doc_date });
     for (const row of transfers) docByNumber.set(row.number, { party: '', data: row.data, table: 'transfers', date: row.doc_date });
     for (const row of wastage) docByNumber.set(row.number, { party: '', data: row.data, table: 'wastage', date: row.doc_date });

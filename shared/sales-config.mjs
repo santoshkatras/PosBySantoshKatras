@@ -16,6 +16,8 @@ export const DEFAULT_SALES_CONFIG = {
   bill: { ...base },
   // company-wide: a scanned serial number (IMEI / Serial No) brings its item in every outward screen
   serialScan: true,
+  // company-wide: a Carton column in the sales windows, and a “how many cartons?” box for items that allow cartons
+  carton: false,
 };
 
 const pick = (v, list, fb) => (list.some(([id]) => id === v) ? v : fb);
@@ -39,13 +41,14 @@ export function normalizeSalesConfig(raw) {
     order: { ...one(r.order, DEFAULT_SALES_CONFIG.order), advance: pick(r.order?.advance, ADVANCE_MODES, 'ask'), minAdvancePct: pct(r.order?.minAdvancePct) },
     bill: one(r.bill, DEFAULT_SALES_CONFIG.bill),
     serialScan: r.serialScan !== false,
+    carton: r.carton === true,
   };
 }
 // the rules for one sales document type
 export function salesRules(config, type) {
   const c = normalizeSalesConfig(config);
-  if (type === 'bill') return { ...c.bill, serialScan: c.serialScan };
-  if (type === 'order') return { ...c.order, serialScan: c.serialScan };
-  if (type === 'quotation') return { ...c.order, advance: 'off', serialScan: c.serialScan };
+  if (type === 'bill') return { ...c.bill, serialScan: c.serialScan, carton: c.carton };
+  if (type === 'order') return { ...c.order, serialScan: c.serialScan, carton: c.carton };
+  if (type === 'quotation') return { ...c.order, advance: 'off', serialScan: c.serialScan, carton: c.carton };
   return null;
 }

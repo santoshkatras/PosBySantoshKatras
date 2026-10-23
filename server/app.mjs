@@ -32,9 +32,10 @@ import { createAccounts } from './accounts.mjs';
 import { registerReports } from './reports.mjs';
 import { createActivity } from './activity.mjs';
 import { cleanWarranty, warrantyProblem } from '../shared/warranty.mjs';
-import { ITEM_TYPES, alertAt, alertLevelAt, batchKey, cleanBatchRule, cleanStockLevels, makeBatchNo, reorderAt, typeFromItem, typeOf } from '../shared/item-types.mjs';
+import { ITEM_TYPES, alertAt, alertLevelAt, batchKey, cleanBatchRule, cleanCarton, cleanStockLevels, makeBatchNo, reorderAt, typeFromItem, typeOf } from '../shared/item-types.mjs';
 import { registerUom, unitResolver } from './uom.mjs';
 import { registerRepack } from './repack.mjs';
+import { registerKits } from './kits.mjs';
 import { registerPrintTemplates } from './print-templates.mjs';
 
 // Item-wise settings kept in the item profile (Item Master → Item Configuration).
@@ -149,6 +150,7 @@ async function catalogueMeta(store, companyId) {
   const visible = { ...CATEGORY_VISIBLE };
   const profiles = {};
   let autoCreate = false;
+  let cartonSupport = false;
   for (const row of settings) {
     const key = String(row.setting_key || '');
     const labelMatch = key.match(/^category_label_(\d+)$/);
@@ -156,6 +158,7 @@ async function catalogueMeta(store, companyId) {
     if (labelMatch && labels[labelMatch[1]]) labels[labelMatch[1]] = row.setting_value || labels[labelMatch[1]];
     if (visibleMatch && visibleMatch[1] in visible) visible[visibleMatch[1]] = String(row.setting_value) === '1';
     if (key === 'category_auto_create') autoCreate = String(row.setting_value) === '1';
+    if (key === 'item_carton_support') cartonSupport = String(row.setting_value) === '1';
     if (key.startsWith('item_profile_')) {
       try { profiles[key.slice('item_profile_'.length)] = JSON.parse(row.setting_value); } catch { profiles[key.slice('item_profile_'.length)] = null; }
     }
@@ -172,7 +175,7 @@ async function catalogueMeta(store, companyId) {
   serialVisible.serial1 = true;
   labels['1'] = ITEM_TYPE_LABEL;
   visible['1'] = true;
-  return { labels, visible, profiles, autoCreate, serialLabels, serialVisible };
+  return { labels, visible, profiles, autoCreate, cartonSupport, serialLabels, serialVisible };
 }
 
 // Serial number fields, renamed and switched on in Main Category Setups.
@@ -212,6 +215,7 @@ const FEATURE_GATES = [
   ['/api/price-updates', ['price-updates'], true, 'Price Updates'],
   ['/api/barcodes', ['print-barcodes'], false, 'Print Barcodes'],
   ['/api/repack', ['repacking'], false, 'Repacking'],
+  ['/api/kits', ['kit-mapping', 'kit-packing'], false, 'KIT/Combo'],
   ['/api/wastage', ['wastage'], false, 'Wastage Entry'],
   ['/api/transfers', ['transfer-request', 'transfer-out', 'transfer-in', 'transfer-approvals'], true, 'Transfer Orders'],
   ['/api/promotions/offers', ['offers'], true, 'Offer Management'],
@@ -597,6 +601,10 @@ export async function createApp(options = {}) {
     if (typeof req.body?.autoCreate === 'boolean') {
       await writeSetting(store, req.companyId, 'category_auto_create', req.body.autoCreate ? '1' : '0');
     }
+    // Item settings → “Enable cartoon support” (Allow Cartoon + carton sizes on the Item Master)
+    if (typeof req.body?.cartonSupport === 'boolean') {
+      await writeSetting(store, req.companyId, 'item_carton_support', req.body.cartonSupport ? '1' : '0');
+    }
     res.json(await catalogueMeta(store, req.companyId));
   }));
   // UPC / EAN lookup: our own catalogue first, then the public product databases.
@@ -828,6 +836,7 @@ export async function createApp(options = {}) {
         expiry: body.trackingType === 'serial' ? cleanExpiry({}) : cleanExpiry(body.expiry),
         warranty,
         source: cleanSource(body.source),
+        carton: cleanCarton(body.carton),
       },
     });
     if (serialRows.length) {
@@ -965,7 +974,7 @@ export async function createApp(options = {}) {
       unitId: product.unit_id,
       categoryId: product.category_id || '',
       brandName: shaped.brand?.name || '',
-      profile: { kind: profile.kind || (product.tracking_type === 'serial' ? 'electronics' : 'grocery'), slots: profile.slots || {}, upc: profile.upc || '', image: profile.image || '', notes: profile.notes || '', group: profile.group || '', parent: profile.parent || '', settings: profile.settings || {}, expiry: cleanExpiry(profile.expiry || {}), warranty: cleanWarranty(profile.warranty || {}), itemType: typeFromItem({ profile, trackingType: product.tracking_type, isService: on(product.is_service) }), parentId: profile.parentId || '', parentQty: profile.parentQty || '', bulkOf: profile.bulkOf || null, reorderAlert: profile.reorderAlert !== false, stockLevels: profile.stockLevels || {}, batch: cleanBatchRule(profile.batch || {}), uom: profile.uom || null, source: profile.source || null, extraCodes: profile.extraCodes || [] },
+      profile: { kind: profile.kind || (product.tracking_type === 'serial' ? 'electronics' : 'grocery'), slots: profile.slots || {}, upc: profile.upc || '', image: profile.image || '', notes: profile.notes || '', group: profile.group || '', parent: profile.parent || '', settings: profile.settings || {}, expiry: cleanExpiry(profile.expiry || {}), warranty: cleanWarranty(profile.warranty || {}), itemType: typeFromItem({ profile, trackingType: product.tracking_type, isService: on(product.is_service) }), parentId: profile.parentId || '', parentQty: profile.parentQty || '', bulkOf: profile.bulkOf || null, reorderAlert: profile.reorderAlert !== false, stockLevels: profile.stockLevels || {}, batch: cleanBatchRule(profile.batch || {}), uom: profile.uom || null, source: profile.source || null, extraCodes: profile.extraCodes || [], carton: cleanCarton(profile.carton || {}) },
       stockQty: levels.reduce((sum, row) => sum + Number(row.qty_on_hand || 0), 0),
       serialsInStock: serials,
     });
@@ -1130,6 +1139,7 @@ export async function createApp(options = {}) {
       stockLevels: body.stockLevels === undefined ? profile.stockLevels || {} : cleanStockLevels(body.stockLevels),
       reorderAlert: body.reorderAlert === undefined ? profile.reorderAlert !== false : body.reorderAlert !== false,
       batch: body.batch === undefined ? cleanBatchRule(profile.batch || {}) : cleanBatchRule(body.batch),
+      carton: body.carton === undefined ? cleanCarton(profile.carton || {}) : cleanCarton(body.carton),
     }));
     await store.insert('audit_logs', { company_id: req.companyId, user_id: req.session.user.id, action: 'catalogue.edit', entity: 'product', entity_id: product.id, created_at: new Date().toISOString() });
     const [saved] = await store.find('products', { id: product.id });
@@ -1607,7 +1617,8 @@ export async function createApp(options = {}) {
         const parentVariant = variants.find((row) => row.product_id === profile.parentId);
         if (parentProduct && parentVariant) child = { productId: parentProduct.id, variantId: parentVariant.id, name: parentProduct.name, sku: parentVariant.sku, ratio: Number(profile.parentQty) > 0 ? Number(profile.parentQty) : 1, unit: units.find((row) => row.id === parentProduct.unit_id)?.code || '' };
       }
-      const extra = { itemType, ...(choice ? { units: choice.units, unitUse: choice.unitUse, conversionId: choice.conversionId } : {}), ...(child ? { child } : {}), ...(typeOf(itemType).service ? { stockless: true } : {}) };
+      const carton = meta.cartonSupport && profile.carton?.allow ? cleanCarton(profile.carton) : null;
+      const extra = { itemType, ...(carton ? { carton } : {}), ...(choice ? { units: choice.units, unitUse: choice.unitUse, conversionId: choice.conversionId } : {}), ...(child ? { child } : {}), ...(typeOf(itemType).service ? { stockless: true } : {}) };
       const shaped = own.map((variant) => ({
         variantId: variant.id,
         productId: product.id,
@@ -1625,9 +1636,9 @@ export async function createApp(options = {}) {
       const expiry = profile.expiry?.enabled && product.tracking_type !== 'serial' ? cleanExpiry(profile.expiry) : null;
       if (expiry && cleanBatchRule(profile.batch || {}).auto) { expiry.batchMandatory = false; expiry.autoBatch = true; }
       if (product.tracking_type === 'serial') {
-        items.push({ key: `p:${product.id}`, kind: 'serial', code: own[0].sku, name: product.name, unit: unit?.code || '', gst, codes, eans, productId: product.id, variants: shaped, categoryId: product.category_id || '', brandId: product.brand_id || '', itemType });
+        items.push({ key: `p:${product.id}`, kind: 'serial', code: own[0].sku, name: product.name, unit: unit?.code || '', gst, codes, eans, productId: product.id, variants: shaped, categoryId: product.category_id || '', brandId: product.brand_id || '', itemType, ...(carton ? { carton } : {}) });
       } else if (profile.kind === 'matrix' && profile.group) {
-        const group = groups.get(profile.group) || { key: `g:${profile.group}`, kind: 'matrix', name: profile.parent || product.name, unit: unit?.code || '', gst, codes: [], eans: [], productId: product.id, variants: [], categoryId: product.category_id || '', brandId: product.brand_id || '', itemType: 'matrix', ...(choice ? { units: choice.units, unitUse: choice.unitUse, conversionId: choice.conversionId } : {}) };
+        const group = groups.get(profile.group) || { key: `g:${profile.group}`, kind: 'matrix', name: profile.parent || product.name, unit: unit?.code || '', gst, codes: [], eans: [], productId: product.id, variants: [], categoryId: product.category_id || '', brandId: product.brand_id || '', itemType: 'matrix', ...(carton ? { carton } : {}), ...(choice ? { units: choice.units, unitUse: choice.unitUse, conversionId: choice.conversionId } : {}) };
         // every variant of the group must share the conversion, else entry stays in the base unit
         if (group.conversionId && group.conversionId !== choice?.conversionId) { delete group.units; delete group.unitUse; group.conversionId = 'mixed'; }
         group.codes.push(...codes);
@@ -2614,6 +2625,7 @@ export async function createApp(options = {}) {
   registerTransfers(app, store, { auth, allow, route, fail, locationAllowed, pickerItems, changeStock, stockLocation, on, qty, expiryOf, addBatches, consumeBatches, lots, childBlock });
   registerWastage(app, store, { auth, allow, route, fail, locationAllowed, pickerItems, changeStock, stockLocation, on, qty, expiryOf, consumeBatches, lots, childBlock });
   registerRepack(app, store, { auth, allow, route, fail, locationAllowed, scopedLocations, stockLocation, changeStock, expiryOf, consumeBatches, addBatches, fillBatchNos, catalogueMeta, on, qty, money });
+  registerKits(app, store, { auth, allow, route, fail, locationAllowed, scopedLocations, stockLocation, changeStock, consumeBatches, addBatches, fillBatchNos, catalogueMeta, on, qty, money });
   registerMigration(app, store, { auth, allow, route, fail, on });
   lots.register(app, { auth, allow, route, fail, locationAllowed });
   registerDataCleanup(app, store, { auth, route, fail, writeSetting });

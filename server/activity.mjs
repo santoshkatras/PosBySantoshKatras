@@ -34,6 +34,8 @@ const RULES = [
   ['POST', /^\/api\/transfers\//, 'Transfer action', 'stock'],
   ['POST', /^\/api\/wastage/, 'Wastage', 'stock'],
   ['POST', /^\/api\/repack$/, 'Repacking', 'stock'],
+  ['POST', /^\/api\/kits\/packs$/, 'KIT/Combo packing', 'stock'],
+  ['PUT', /^\/api\/kits\/mapping\//, 'KIT/Combo mapping changed', 'catalogue'],
   ['POST', /^\/api\/price-updates$/, 'Price update', 'stock'],
   ['POST', /^\/api\/held-bills/, 'Held bill', 'other'],
   ['POST', /^\/api\/users$/, 'User created', 'settings'],

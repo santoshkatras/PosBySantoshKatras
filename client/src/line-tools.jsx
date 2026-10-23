@@ -376,3 +376,30 @@ export function scanLotInto(lines, found, item, makeLine, { remove = false, step
   const next = { ...base, saved: true, scanned: code, variants: base.variants.map((v, i) => (i === vIndex ? { ...v, qty: String(qtyNow), lots: lotsNow } : v)) };
   return { lines: existing ? lines.map((l) => (l === existing ? next : l)) : [...lines, next], ok: true, text: `${item.name}${item.kind === 'matrix' ? ` (${row.sku})` : ''}: +${step} from ${code} → ${fmt(qtyNow)}` };
 }
+
+// Current stock of an item at every location (in the item window of inward / outward entries). The entry's location is highlighted.
+export function LocationStock({ variantIds = [], locationId = '', unit = '', label = 'Stock by location' }) {
+  const { request } = useAuth();
+  const key = [...new Set(variantIds.filter(Boolean))].join(',');
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    if (!key) return undefined;
+    let live = true;
+    setData(null);
+    request(`/stock/by-location?variantIds=${encodeURIComponent(key)}`).then((d) => { if (live) setData(d); }).catch(() => { if (live) setData({ locations: [], stock: {}, total: 0, failed: true }); });
+    return () => { live = false; };
+  }, [request, key]);
+  if (!key) return null;
+  const fmt = (v) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 3 }).format(Number(v) || 0);
+  return (
+    <div className="lt-locstock" aria-label={label}>
+      <b>{label}</b>
+      {!data ? <small>Loading…</small> : data.failed ? <small>Stock not available</small> : (
+        <>
+          {data.locations.map((l) => <span key={l.id} className={`${l.id === locationId ? 'here' : ''}${(data.stock[l.id] || 0) > 0 ? '' : ' zero'}`} title={l.id === locationId ? 'This entry’s location' : undefined}>{l.name}<em>{fmt(data.stock[l.id])}{unit ? ` ${unit}` : ''}</em></span>)}
+          {data.locations.length > 1 ? <span className="tot">Total<em>{fmt(data.total)}{unit ? ` ${unit}` : ''}</em></span> : null}
+        </>
+      )}
+    </div>
+  );
+}

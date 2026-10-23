@@ -33,12 +33,12 @@ export const DEFAULT_PACKAGES = [
   {
     code: 'free', name: 'Free Tier', limits: { locations: 1, users: 1 },
     modules: only(['catalogue', 'stock', 'sales', 'customers']),
-    features: off(['price-list', 'price-updates', 'unit-conversion', 'repacking', 'wastage', ...TRANSFERS, ...PROMOS, 'warranty-desk', 'sales-quotation', 'sales-order', 'stock-analysis', 'org-structure', 'data-migration', 'print-templates', 'tender-types']),
+    features: off(['price-list', 'price-updates', 'unit-conversion', 'repacking', 'kit-mapping', 'kit-packing', 'wastage', ...TRANSFERS, ...PROMOS, 'warranty-desk', 'sales-quotation', 'sales-order', 'stock-analysis', 'org-structure', 'data-migration', 'print-templates', 'tender-types']),
   },
   {
     code: 'starter', name: 'Starter', limits: { locations: 1, users: 3 },
     modules: only(['catalogue', 'stock', 'purchase', 'sales', 'customers', 'notifications', 'serial', 'bike_service']),
-    features: off(['unit-conversion', 'repacking', ...TRANSFERS, ...PROMOS, 'warranty-desk', 'stock-analysis', 'org-structure', 'data-migration']),
+    features: off(['unit-conversion', 'repacking', 'kit-mapping', 'kit-packing', ...TRANSFERS, ...PROMOS, 'warranty-desk', 'stock-analysis', 'org-structure', 'data-migration']),
   },
   {
     code: 'standard', name: 'Standard', limits: { locations: 3, users: 8 },

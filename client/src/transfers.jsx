@@ -4,10 +4,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from './auth.jsx';
 import { useFeedback } from './feedback.jsx';
 import { useFitHeight } from './fit-height.js';
-import { ItemSearch, KIND_LABEL, Popup, decimal, inr, message, num } from './opening-stock.jsx';
+import { ItemSearch, KIND_LABEL, Popup, PopupTop, decimal, inr, message, num } from './opening-stock.jsx';
 import { SerialPicker, useSerialFields } from './stock-grids.jsx';
 import { TransferFilter, blankFilter, scopeItems } from './transfer-filter.jsx';
-import { LotPicker, ScanBar, lotTotal, matchesItemText, scanLotInto, useScanMode, useSerialScan, useStockBarcodeConfig } from './line-tools.jsx';
+import { LocationStock, LotPicker, ScanBar, lotTotal, matchesItemText, scanLotInto, useScanMode, useSerialScan, useStockBarcodeConfig } from './line-tools.jsx';
 import { isStockBarcode } from '../../shared/stock-barcode.mjs';
 import './line-tools.css';
 import { defaultUnit, factorOf, fitsUnit, lineQtyText, lineWithUnits, openUnit, rowFromBase, rowToBase, swapRate, uomOf } from '../../shared/units.mjs';
@@ -410,7 +410,7 @@ function TransferWindow({ kind, source, onClose, onSaved }) {
           <button type="button" className="btn primary" disabled={pending || !setup} onClick={save} data-sc="doc-save">{pending ? 'Saving…' : `Save ${meta.label}`}</button>
         </footer>
       </div>
-      {Line ? <Line line={popup.line} setup={setup} fromId={fromId} toId={toId} kind={kind} pickMode={barcodeCfg.outwardPick || 'ask'} onSave={savePopup} onClose={() => { setPopup(null); setTimeout(() => codeRef.current?.focus(), 30); }} /> : null}
+      {Line ? <PopupTop.Provider value={<LocationStock variantIds={(popup.line.variants || []).map((v) => v.variantId)} locationId={fromId} unit={popup.line.unit || ''} />}><Line line={popup.line} setup={setup} fromId={fromId} toId={toId} kind={kind} pickMode={barcodeCfg.outwardPick || 'ask'} onSave={savePopup} onClose={() => { setPopup(null); setTimeout(() => codeRef.current?.focus(), 30); }} /></PopupTop.Provider> : null}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { useFeedback } from './feedback.jsx';
 import { BatchEditor, batchTotal, blankBatch } from './batch-entry.jsx';
 import { checkBatches, formatExpiry } from '../../shared/expiry.mjs';
 import { useFitHeight } from './fit-height.js';
-import { CopyIcon, ItemSearch, KIND_LABEL, Popup, decimal, inr, message, num, typedRows } from './opening-stock.jsx';
+import { CopyIcon, ItemSearch, KIND_LABEL, Popup, PopupTop, decimal, inr, message, num, typedRows } from './opening-stock.jsx';
 import { SerialGrid, SerialPicker, blankSerial, useSerialFields } from './stock-grids.jsx';
 import { DOC_TYPES, MODULE_PARTY, docTotals, docType, flatRows, lineAmounts, sourceTypes, stockDirection } from '../../shared/documents.mjs';
 import { applyFormula, formulaForSupplier, priceLine } from '../../shared/purchase-formula.mjs';
@@ -18,7 +18,7 @@ import { AdvanceField } from './accounts.jsx';
 import { focusNext } from './keyboard.js';
 import './accounts.css';
 import { PartyHistory } from './party-history.jsx';
-import { AGE_COLUMNS, ColumnPicker, EanStrip, LotPicker, ScanBar, ageOf, lotTotal, useColumns, useScanMode, useStockBarcodeConfig } from './line-tools.jsx';
+import { AGE_COLUMNS, ColumnPicker, EanStrip, LocationStock, LotPicker, ScanBar, ageOf, lotTotal, useColumns, useScanMode, useStockBarcodeConfig } from './line-tools.jsx';
 import { isStockBarcode } from '../../shared/stock-barcode.mjs';
 import { sellingPrice } from '../../shared/selling-rate.mjs';
 import { defaultUnit, factorOf, lineWithUnits, openUnit, rowFromBase, rowToBase, swapRate, uomOf } from '../../shared/units.mjs';
@@ -266,6 +266,30 @@ function BatchPriceNote({ parts, dir, inclusive }) {
   const rateOf = (l) => (l.kind === 'serial' ? num(l.picked.rate) : num(l.variants.find((v) => num(v.qty) > 0)?.rate));
   const total = parts.reduce((sum, l) => sum + lineAmounts(l, dir, inclusive).total, 0);
   return <p className="dc-batchprice">Batch-wise price: {parts.map((l) => `${qtyText(qtyOf(l))} × ${inr(rateOf(l))}`).join(' + ')} = <b>{inr(total)}</b> — added as {parts.length} bill lines.</p>;
+}
+
+// Cartons (Sales Configurations → carton column): asked first in the item window of an item that allows cartons.
+// The size is a label (e.g. 5x5x5x5); the quantity is entered separately below.
+function CartonBar({ value, sizes = [], onChange }) {
+  const ref = useRef(null);
+  useEffect(() => { const t = setTimeout(() => { ref.current?.focus(); ref.current?.select(); }, 90); return () => clearTimeout(t); }, []);
+  const next = (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault(); event.stopPropagation();
+    const box = event.currentTarget.closest('.ose-pop');
+    const target = [...(box?.querySelectorAll('.ose-pop-body input:not([type=checkbox]):not([type=radio]):not([readonly]), .ose-pop-body select') || [])].find((el) => !el.closest('.dc-cartonbar') && !el.disabled && el.offsetParent);
+    target?.focus(); target?.select?.();
+  };
+  return (
+    <div className="dc-cartonbar">
+      <b>Cartons</b>
+      <label>No. of cartons<input ref={ref} inputMode="decimal" value={value?.count ?? ''} placeholder="0" onChange={(event) => onChange({ ...value, count: decimal(event.target.value) })} onKeyDown={next} /></label>
+      {sizes.length > 1 ? (
+        <label>Carton size<select value={value?.size || sizes[0]} onChange={(event) => onChange({ ...value, size: event.target.value })} onKeyDown={next}>{sizes.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
+      ) : <label>Carton size<output className="mono">{sizes[0] || '—'}</output></label>}
+      <small>{num(value?.count) > 0 ? `${qtyText(num(value.count))} × ${value?.size || sizes[0] || 'carton'} — shown in the Carton column. Enter the quantity below.` : 'How many cartons? Leave empty for loose items.'}</small>
+    </div>
+  );
 }
 
 function DiscField({ value, onChange, onKeyDown }) {
@@ -814,6 +838,14 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
   const rules = setup?.salesRules || null;
   // Sales Bill: rate / MRP from the stock barcode or batch going out (Sales Configurations)
   const batchPrice = module === 'sales' && dir < 0 && meta.rate === 'sale' && (rules ? rules.batchPrice !== false : true);
+  // Cartons: Carton column + the carton box for items that allow cartons (Sales Configurations)
+  const cartonOn = module === 'sales' && Boolean(rules?.carton);
+  const [popCarton, setPopCarton] = useState(null);
+  useEffect(() => {
+    if (!popup || !cartonOn) { setPopCarton(null); return; }
+    const it = setup?.items.find((row) => row.key === popup.line.key);
+    setPopCarton(it?.carton?.allow ? (popup.line.carton ? { count: String(popup.line.carton.count), size: popup.line.carton.size } : { count: '', size: it.carton.sizes?.[0] || '' }) : null);
+  }, [popup?.line?.id, popup?.line?.key, cartonOn]); // eslint-disable-line react-hooks/exhaustive-deps
   const takesAdvance = (module === 'sales' && type === 'order' && rules?.advance !== 'off') || (module === 'purchase' && type === 'invoice');
   const advRef = useRef(null);
   const [billDisc, setBillDisc] = useState('');
@@ -1105,6 +1137,10 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
     const fresh = !(Array.isArray(raw) ? raw[0] : raw).saved;
     // batch-wise price: stock at different prices becomes one line per price
     const list = (Array.isArray(raw) ? raw : [raw]).flatMap((l) => (batchPrice ? splitByBatchPrice(l) : [l])).map((l) => ({ ...(billDisc !== '' && fresh && !num(l.disc) ? { ...l, disc: billDisc } : l), saved: true }));
+    if (popCarton) {
+      const { carton: _old, ...first } = list[0];
+      list[0] = num(popCarton.count) > 0 ? { ...first, carton: { count: popCarton.count, size: popCarton.size || '' } } : first;
+    }
     setLines((current) => {
       const next = [...current];
       const at = next.findIndex((row) => row.id === list[0].id);
@@ -1182,6 +1218,15 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
   }
 
   const pickMode = barcodeCfg.outwardPick || 'ask';
+  // top of the item window: current stock at every location, and the carton box for carton items
+  const popItem = popup ? setup?.items.find((it) => it.key === popup.line.key) : null;
+  const popAsksCarton = Boolean(cartonOn && popItem?.carton?.allow);
+  const popTop = popup ? (
+    <>
+      <LocationStock variantIds={popup.line.child ? [popup.line.child.variantId] : popItem?.service || popItem?.stockless ? [] : (popItem?.variants || popup.line.variants || []).map((v) => v.variantId)} locationId={locationId} unit={popup.line.child ? popup.line.child.unit : popItem?.unit || popup.line.unit || ''} label={popup.line.child ? `Stock of ${popup.line.child.name} (parent) by location` : 'Stock by location'} />
+      {popAsksCarton ? <CartonBar value={popCarton || {}} sizes={popItem.carton.sizes || []} onChange={setPopCarton} /> : null}
+    </>
+  ) : null;
   const Line = popup ? (popup.line.kind === 'standard' ? QtyPopup : popup.line.kind === 'matrix' ? GridPopup : dir > 0 ? SerialInPopup : dir < 0 ? SerialOutPopup : GridPopup) : null;
   const effect = dir > 0 ? 'Saving receives the stock into the location.' : dir < 0 ? 'Saving takes the stock out of the location.' : module === 'purchase' && type === 'invoice' && src ? `Stock was already received on ${src.number}; this invoice does not add it again.` : 'This document does not change stock.';
 
@@ -1263,11 +1308,12 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
               <col style={{ width: 40 }} /><col style={{ width: 128 }} /><col /><col style={{ width: 86 }} /><col style={{ width: 56 }} />
               <col style={{ width: 70 }} /><col style={{ width: 100 }} /><col style={{ width: 64 }} /><col style={{ width: 58 }} />
               <col style={{ width: 108 }} /><col style={{ width: 94 }} /><col style={{ width: 116 }} /><col style={{ width: 66 }} />
+              {cartonOn ? <col style={{ width: 110 }} /> : null}
             </colgroup>
             <thead>
               <tr>
                 <th className="ose-n">#</th><th>Item Code</th><th>Item Name</th><th>Type</th><th>Unit</th>
-                <th className="num">Qty</th><th className="num">Rate ₹</th><th className="num">Disc %</th><th className="num">GST %</th>
+                <th className="num">Qty</th>{cartonOn ? <th className="num">Carton</th> : null}<th className="num">Rate ₹</th><th className="num">Disc %</th><th className="num">GST %</th>
                 <th className="num">Taxable ₹</th><th className="num">GST ₹</th><th className="num">Amount ₹</th><th className="no-pin" aria-label="Actions" />
               </tr>
             </thead>
@@ -1283,6 +1329,7 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
                     <td><span className={`ose-kind ${line.kind}`}>{KIND_LABEL[line.kind]}</span></td>
                     <td>{unitName(line) || '—'}</td>
                     <td className="num"><strong>{unitQty(line, amount.qty)}</strong>{factorOf(line.uom) !== 1 ? <small className="up-hint">{qtyText(amount.qty)} {line.unit}</small> : null}</td>
+                    {cartonOn ? <td className="num">{num(line.carton?.count) > 0 ? <><strong>{qtyText(num(line.carton.count))}</strong>{line.carton.size ? <small className="up-hint">× {line.carton.size}</small> : null}</> : '—'}</td> : null}
                     <td className="num">{info.rate}</td>
                     <td className="num">{num(line.disc) ? `${line.disc}%` : '—'}</td>
                     <td className="num">{line.gst}%</td>
@@ -1302,7 +1349,7 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
                 <td className="ose-n">{lines.length + 1}</td>
                 <td><ItemSearch items={setup?.items || []} field="code" placeholder={setup ? (scanMode === 'remove' ? 'Scan to REMOVE 1' : 'Scan / type code') : 'Loading items…'} onPick={pick} onScan={onScan} inputRef={codeRef} /></td>
                 <td><ItemSearch items={setup?.items || []} field="name" placeholder="Search item name" onPick={pick} /></td>
-                <td colSpan={10} className="ose-entry-hint">{lines.length ? 'Add the next item' : 'Pick an item to open its quantity window'}</td>
+                <td colSpan={cartonOn ? 11 : 10} className="ose-entry-hint">{lines.length ? 'Add the next item' : 'Pick an item to open its quantity window'}</td>
               </tr>
             </tbody>
           </table>
@@ -1341,7 +1388,7 @@ export function DocumentWindow({ module, type, source, onClose, onSaved }) {
       {tool === 'return' ? <ReturnExchangePopup locationId={locationId} registerId={registerId} onClose={() => setTool('')} onDone={returnDone} onUseCredit={(c) => { setTool(''); setReturnCredit(c); feedback.toast(`${c.number}: ${inr(c.amount)} credit added to this bill.`); }} /> : null}
       {tool === 'held' ? <HeldBillsPopup onClose={() => { setTool(''); refreshHeld(); }} onRecall={recallHeld} /> : null}
       {tool === 'order' ? <LoadOrderPopup onClose={() => setTool('')} onPick={loadOrder} /> : null}
-      {Line ? <Line lockRate={Boolean(rules && !rules.editRates)} batchPrice={batchPrice} line={{ ...popup.line, productId: popup.line.productId || setup?.items.find((it) => it.key === popup.line.key)?.productId, eans: popup.line.eans?.length ? popup.line.eans : setup?.items.find((it) => it.key === popup.line.key)?.eans || [], categoryId: popup.line.categoryId || setup?.items.find((it) => it.key === popup.line.key)?.categoryId, brandId: popup.line.brandId || setup?.items.find((it) => it.key === popup.line.key)?.brandId }} meta={meta} dir={dir} inclusive={inclusive} locationId={locationId} pickMode={pickMode} formula={formula} party={party || {}} selling={setup?.selling} item={setup?.items.find((it) => it.key === popup.line.key)} onItem={(fresh) => setSetup((cur) => (cur ? { ...cur, items: cur.items.map((it) => (it.key === fresh.key ? fresh : it)) } : cur))} onSave={savePopup} onClose={() => { setPopup(null); setTimeout(() => codeRef.current?.focus(), 30); }} /> : null}
+      {Line ? <PopupTop.Provider value={popTop}><Line lockRate={Boolean(rules && !rules.editRates)} batchPrice={batchPrice} line={{ ...popup.line, productId: popup.line.productId || setup?.items.find((it) => it.key === popup.line.key)?.productId, eans: popup.line.eans?.length ? popup.line.eans : setup?.items.find((it) => it.key === popup.line.key)?.eans || [], categoryId: popup.line.categoryId || setup?.items.find((it) => it.key === popup.line.key)?.categoryId, brandId: popup.line.brandId || setup?.items.find((it) => it.key === popup.line.key)?.brandId }} meta={meta} dir={dir} inclusive={inclusive} locationId={locationId} pickMode={pickMode} formula={formula} party={party || {}} selling={setup?.selling} item={setup?.items.find((it) => it.key === popup.line.key)} onItem={(fresh) => setSetup((cur) => (cur ? { ...cur, items: cur.items.map((it) => (it.key === fresh.key ? fresh : it)) } : cur))} onSave={savePopup} onClose={() => { setPopup(null); setTimeout(() => codeRef.current?.focus(), 30); }} /></PopupTop.Provider> : null}
     </div>
   );
 }
@@ -1366,7 +1413,7 @@ function printDocument(doc, tenant) {
     const amount = lineAmounts(line, dir, doc.inclusive);
     const serial = line.kind === 'serial' ? (line.picked?.codes?.join(', ') || (line.serials?.rows || []).map((row) => row.serial1).join(', ') || line.serialInfo || '') : '';
     const variants = line.kind === 'matrix' ? (line.variants || []).filter((row) => num(row.qty) > 0).map((row) => `${row.sku} × ${qtyText(row.qty)}`).join(', ') : '';
-    return `<tr><td>${index + 1}</td><td><b>${esc(line.name)}</b><div class="s">${esc(line.code)}${variants ? ` · ${esc(variants)}` : ''}${serial ? `<br>S/N: ${esc(serial)}` : ''}${(line.warranty || []).length ? `<br>${line.warranty.map((w) => `${esc(w.serial)}: ${w.warrantyEnd ? `Warranty ${esc(w.warranty)} till ${esc(day(w.warrantyEnd))}` : ''}${w.guaranteeEnd ? `${w.warrantyEnd ? ' · ' : ''}Replacement till ${esc(day(w.guaranteeEnd))}` : ''}`).join('<br>')}${line.warrantyTerms ? `<br><i>${esc(line.warrantyTerms)}</i>` : ''}` : ''}</div></td><td class="r">${esc(unitQty(line, amount.qty))} ${factorOf(line.uom) !== 1 ? `<div class="s">${qtyText(amount.qty)} ${esc(line.unit || '')}</div>` : esc(line.unit || '')}</td><td class="r">${esc(summary(line, dir).rate)}</td><td class="r">${num(line.disc) ? `${line.disc}%` : ''}</td><td class="r">${line.gst}%</td><td class="r">${inr(amount.taxable)}</td><td class="r">${inr(amount.total)}</td></tr>`;
+    return `<tr><td>${index + 1}</td><td><b>${esc(line.name)}</b><div class="s">${esc(line.code)}${variants ? ` · ${esc(variants)}` : ''}${serial ? `<br>S/N: ${esc(serial)}` : ''}${num(line.carton?.count) > 0 ? `<br>Cartons: ${esc(qtyText(num(line.carton.count)))}${line.carton.size ? ` × ${esc(line.carton.size)}` : ''}` : ''}${(line.warranty || []).length ? `<br>${line.warranty.map((w) => `${esc(w.serial)}: ${w.warrantyEnd ? `Warranty ${esc(w.warranty)} till ${esc(day(w.warrantyEnd))}` : ''}${w.guaranteeEnd ? `${w.warrantyEnd ? ' · ' : ''}Replacement till ${esc(day(w.guaranteeEnd))}` : ''}`).join('<br>')}${line.warrantyTerms ? `<br><i>${esc(line.warrantyTerms)}</i>` : ''}` : ''}</div></td><td class="r">${esc(unitQty(line, amount.qty))} ${factorOf(line.uom) !== 1 ? `<div class="s">${qtyText(amount.qty)} ${esc(line.unit || '')}</div>` : esc(line.unit || '')}</td><td class="r">${esc(summary(line, dir).rate)}</td><td class="r">${num(line.disc) ? `${line.disc}%` : ''}</td><td class="r">${line.gst}%</td><td class="r">${inr(amount.taxable)}</td><td class="r">${inr(amount.total)}</td></tr>`;
   }).join('');
   const t = doc.totals || {};
   const party = doc.party || { name: doc.partyName };

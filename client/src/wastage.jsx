@@ -3,11 +3,11 @@ import { MaxButton } from './maximize.jsx';
 import { useAuth } from './auth.jsx';
 import { useFeedback } from './feedback.jsx';
 import { useFitHeight } from './fit-height.js';
-import { ItemSearch, KIND_LABEL, Popup, decimal, inr, message, num } from './opening-stock.jsx';
+import { ItemSearch, KIND_LABEL, Popup, PopupTop, decimal, inr, message, num } from './opening-stock.jsx';
 import { SerialPicker, useSerialFields } from './stock-grids.jsx';
 import { Field, Num } from './promotions.jsx';
 import { DEFAULT_WASTAGE_CONFIG, WASTAGE_TONE, wastageQty, wastageTotals } from '../../shared/wastage.mjs';
-import { LotPicker, ScanBar, lotTotal, matchesItemText, scanLotInto, useScanMode, useSerialScan, useStockBarcodeConfig } from './line-tools.jsx';
+import { LocationStock, LotPicker, ScanBar, lotTotal, matchesItemText, scanLotInto, useScanMode, useSerialScan, useStockBarcodeConfig } from './line-tools.jsx';
 import { isStockBarcode } from '../../shared/stock-barcode.mjs';
 import './line-tools.css';
 import { defaultUnit, factorOf, lineQtyText, lineWithUnits, openUnit, rowFromBase, rowToBase, swapRate, uomOf } from '../../shared/units.mjs';
@@ -359,7 +359,7 @@ function WastageWindow({ onClose, onSaved }) {
           <button type="button" className="btn primary" disabled={pending || !setup} onClick={save} data-sc="entry-save">{pending ? 'Saving…' : 'Save Wastage'}</button>
         </footer>
       </div>
-      {Line ? <Line line={popup.line} setup={setup} locationId={locationId} reasons={reasons} barcodes={barcodeCfg.enabled !== false} pickMode={barcodeCfg.outwardPick || 'ask'} onSave={savePopup} onClose={() => { setPopup(null); setTimeout(() => codeRef.current?.focus(), 30); }} /> : null}
+      {Line ? <PopupTop.Provider value={<LocationStock variantIds={(popup.line.variants || []).map((v) => v.variantId)} locationId={locationId} unit={popup.line.unit || ''} />}><Line line={popup.line} setup={setup} locationId={locationId} reasons={reasons} barcodes={barcodeCfg.enabled !== false} pickMode={barcodeCfg.outwardPick || 'ask'} onSave={savePopup} onClose={() => { setPopup(null); setTimeout(() => codeRef.current?.focus(), 30); }} /></PopupTop.Provider> : null}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { MaxButton } from './maximize.jsx';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from './api.js';
@@ -9,7 +9,7 @@ import { useFitHeight } from './fit-height.js';
 import { SerialGrid, blankSerial, useSerialFields } from './stock-grids.jsx';
 import { BatchEditor, batchTotal, blankBatch } from './batch-entry.jsx';
 import { checkBatches } from '../../shared/expiry.mjs';
-import { EanStrip, ScanBar, useScanMode } from './line-tools.jsx';
+import { EanStrip, LocationStock, ScanBar, useScanMode } from './line-tools.jsx';
 import './line-tools.css';
 import { defaultUnit, factorOf, lineQtyText, openUnit, rowFromBase, rowToBase, swapRate, uomOf } from '../../shared/units.mjs';
 import { BaseHint, UnitSelect } from './unit-pick.jsx';
@@ -18,6 +18,9 @@ import './documents.css';
 import './opening-stock.css';
 
 export const KIND_LABEL = { standard: 'Standard', matrix: 'Matrix', serial: 'Serialised' };
+// Something an entry window shows at the top of its item window (stock by location, cartons) — set by the window,
+// shown by the item window's Popup only (not by pop-ups opened inside it).
+export const PopupTop = createContext(null);
 
 export function message(error) {
   return error instanceof ApiError ? error.message : 'Something went wrong. Try again.';
@@ -181,6 +184,7 @@ export const typedRows = (rows) => JSON.stringify((rows || []).map((r) => ['qty'
 // ============ Pop-ups, one per item type ============
 export function Popup({ title, subtitle, wide, extraClass = '', onClose: closeNow, children, footer, confirmClose = null }) {
   const feedback = useFeedback();
+  const top = useContext(PopupTop);
   const asking = useRef(false);
   // confirmClose: { message } — ask before throwing away what was typed (Esc, ×, Cancel, click outside)
   const latest = useRef(null);
@@ -212,7 +216,7 @@ export function Popup({ title, subtitle, wide, extraClass = '', onClose: closeNo
           </div>
           <button type="button" className="ose-x" aria-label="Close" onClick={onClose}>×</button>
         </header>
-        <div className="ose-pop-body">{children}</div>
+        <div className="ose-pop-body">{top}<PopupTop.Provider value={null}>{children}</PopupTop.Provider></div>
         <footer>{typeof footer === 'function' ? footer(onClose) : footer}</footer>
       </div>
     </div>
@@ -682,7 +686,7 @@ export function OpeningEntryWindow({ onClose, onSaved }) {
           <button type="button" className="btn primary" disabled={pending || loading} onClick={save} data-sc="entry-save">{pending ? 'Saving…' : 'Save Entry'}</button>
         </footer>
       </div>
-      {Line ? <Line line={popup.line} item={items.find((it) => it.key === popup.line.key)} onItem={(fresh) => setItems((cur) => cur.map((it) => (it.key === fresh.key ? fresh : it)))} onSave={savePopup} onClose={() => { setPopup(null); setTimeout(() => codeRef.current?.focus(), 30); }} /> : null}
+      {Line ? <PopupTop.Provider value={<LocationStock variantIds={(popup.line.variants || []).map((v) => v.variantId)} locationId={locationId} unit={popup.line.unit || ''} />}><Line line={popup.line} item={items.find((it) => it.key === popup.line.key)} onItem={(fresh) => setItems((cur) => cur.map((it) => (it.key === fresh.key ? fresh : it)))} onSave={savePopup} onClose={() => { setPopup(null); setTimeout(() => codeRef.current?.focus(), 30); }} /></PopupTop.Provider> : null}
     </div>
   );
 }

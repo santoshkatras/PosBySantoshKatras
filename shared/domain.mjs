@@ -81,6 +81,8 @@ export const NAV = [
       { id: 'print-barcodes', href: '/menu/print-barcodes', label: 'Print Barcodes', permission: 'catalogue.view', feature: 'catalogue', ready: true },
       { id: 'unit-conversion', href: '/menu/unit-conversion', label: 'Unit Conversion', permission: 'catalogue.view', feature: 'catalogue', ready: true },
       { id: 'repacking', href: '/menu/repacking', label: 'Repacking', permission: 'stock.view', feature: 'stock', ready: true },
+      { id: 'kit-mapping', href: '/menu/kit-mapping', label: 'KIT/Combo Mapping', permission: 'stock.view', feature: 'stock', ready: true },
+      { id: 'kit-packing', href: '/menu/kit-packing', label: 'KIT/Combo Packing', permission: 'stock.view', feature: 'stock', ready: true },
       { id: 'item-ledger', href: '/ledger', label: 'Item Ledger', permission: 'stock.view', feature: 'stock', ready: true },
     ],
   },
