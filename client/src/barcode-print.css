@@ -85,3 +85,18 @@
 .bp-mx .bp-colf{width:100%;min-width:52px;height:28px;border:1px solid #d0d5dd;border-radius:6px;padding:0 6px;font:inherit;font-size:12px;font-weight:500;background:#fff;color:#101828}
 .bp-mx .bp-colf:focus{outline:2px solid #2563eb;outline-offset:-1px;border-color:#2563eb}
 .bp-mx-count{margin-left:auto;font-size:12.5px;color:#475467;display:inline-flex;gap:10px;align-items:center}
+
+/* one-line source bar: Transaction type · Transaction · Load */
+.bp-oneline{flex-wrap:nowrap;gap:12px;padding:10px 20px}
+.bp-oneline h2{margin:0;font-size:17px;white-space:nowrap;padding-right:6px}
+.bp-pick{display:flex;align-items:center;gap:8px;margin:0;min-width:0}
+.bp-pick>span{flex:0 0 auto;min-width:0;font-size:12px;font-weight:600;color:#475467;white-space:nowrap}
+.bp-pick .search-select{flex:1 1 auto;min-width:0}
+.bp-pick .search-select input{width:100%;box-sizing:border-box;height:36px;padding:0 10px;border:1px solid #d0d5dd;border-radius:8px;font-size:13.5px;background:#fff}
+.bp-pick .search-select ul{max-height:320px}
+.bp-pick .search-select button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bp-pick .search-select input:disabled{background:#f2f4f7;color:#98a2b3}
+.bp-type{flex:0 0 330px}
+.bp-doc{flex:1 1 auto}
+.bp-oneline>.btn{flex:0 0 auto;min-width:96px}
+@media (max-width:900px){.bp-oneline{flex-wrap:wrap}.bp-oneline h2{flex:1 1 100%}.bp-type,.bp-doc{flex:1 1 100%}.bp-pick>span{min-width:110px}}

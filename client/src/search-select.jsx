@@ -43,7 +43,9 @@ function moveActive(event, length, active, setActive, pick) {
   return false;
 }
 
-export function SearchSelect({ value, onChange, options, placeholder = 'Choose', required = false, allowCreate = false, onCreate }) {
+// inputRef / disabled / onEnter(el) — the caller decides where Enter goes (else the next field); pickFirstOnEnter: Enter with
+// nothing typed and nothing chosen takes the highlighted (first) row.
+export function SearchSelect({ value, onChange, options, placeholder = 'Choose', required = false, allowCreate = false, onCreate, inputRef, disabled = false, onEnter, pickFirstOnEnter = false, ariaLabel }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const selected = options.find((option) => option.id === value);
@@ -63,6 +65,9 @@ export function SearchSelect({ value, onChange, options, placeholder = 'Choose',
   return (
     <div className="search-select">
       <input
+        ref={inputRef}
+        disabled={disabled}
+        aria-label={ariaLabel}
         required={required}
         value={open ? query : (selected?.label || '')}
         placeholder={placeholder}
@@ -74,9 +79,9 @@ export function SearchSelect({ value, onChange, options, placeholder = 'Choose',
             event.preventDefault();
             const el = event.currentTarget;
             if (query.trim() && rows.length) pick(Math.min(active, rows.length - 1));
-            else if (!query.trim() && !selected && rows.length && active > 0) pick(active);
+            else if (!query.trim() && !selected && rows.length && (active > 0 || pickFirstOnEnter)) pick(active);
             setOpen(false);
-            focusNext(el, event.shiftKey);
+            if (onEnter && !event.shiftKey) onEnter(el); else focusNext(el, event.shiftKey);
             return;
           }
           const moved = moveActive(event, rows.length, active, setActive, pick);

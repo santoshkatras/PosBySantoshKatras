@@ -5,6 +5,7 @@ import { useFeedback } from './feedback.jsx';
 import { useFitHeight } from './fit-height.js';
 import { ItemSearch, KIND_LABEL, Popup, decimal, inr, message, num } from './opening-stock.jsx';
 import { barcodeSvg, encode } from './barcode.js';
+import { SearchSelect } from './search-select.jsx';
 import { formatExpiry } from '../../shared/expiry.mjs';
 import './opening-stock.css';
 import './barcode-print.css';
@@ -373,6 +374,15 @@ export function BarcodePrintPage() {
   const scroller = useRef(null);
   const pageRef = useRef(null);
   useFitHeight(pageRef);
+  // Transaction type → Transaction → Load (first focus on Transaction type)
+  const typeRef = useRef(null);
+  const docRef = useRef(null);
+  const loadRef = useRef(null);
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
+  const sourceOptions = SOURCES.filter(([id]) => id !== 'kit' || !(session?.disabledFeatures || []).includes('kit-packing')).map(([id, label]) => ({ id, label: label.replace(/^From /, '') }));
+  const sourceLabel = (sourceOptions.find((o) => o.id === source)?.label || 'transaction').replace(/^Direct Print$/, 'transaction');
+  useEffect(() => { const t = setTimeout(() => typeRef.current?.focus(), 150); return () => clearTimeout(t); }, []);
 
   useEffect(() => {
     request('/barcodes/items').then((data) => { setItems(data.items); if (data.shop) setShop(data.shop); }).catch((err) => setError(message(err)));
@@ -512,6 +522,7 @@ export function BarcodePrintPage() {
         });
       }
       setLines(next);
+      setTimeout(() => codeRef.current?.focus(), 60);
       feedback.toast(`${next.length} item${next.length === 1 ? '' : 's'} loaded from ${docNo}${madeLots.length ? ` with ${madeLots.length} stock barcode${madeLots.length === 1 ? '' : 's'}` : ''}.`);
     } catch (err) {
       setError(message(err));
@@ -587,22 +598,22 @@ export function BarcodePrintPage() {
   return (
     <div className="bp no-side" ref={pageRef}>
       <section className="bp-main">
-        <header className="bp-head">
-          <div><h2>Print Barcodes</h2><p>Pick the source, add items in the item table (a window opens for each item type), set the label and print.</p></div>
-        </header>
-        <div className="bp-sources" role="tablist">
-          {SOURCES.filter(([id]) => id !== 'kit' || !(session?.disabledFeatures || []).includes('kit-packing')).map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={source === id} className={source === id ? 'on' : ''} onClick={() => setSource(id)}>{label}</button>)}
+        {/* one line: Transaction type → Transaction → Load (Enter moves along; Enter on Load loads, then the item code box) */}
+        <div className="bp-docbar bp-oneline">
+          <h2 title="Pick a transaction type and transaction, Load, then set the label and print. Direct Print: add items in the table.">Print Barcodes</h2>
+          <label className="bp-pick bp-type"><span>Transaction type</span>
+            <SearchSelect inputRef={typeRef} ariaLabel="Transaction type" value={source} placeholder="Search type" options={sourceOptions} onChange={(id) => id && setSource(id)}
+              onEnter={() => setTimeout(() => { if (sourceRef.current === 'direct') codeRef.current?.focus(); else docRef.current?.focus(); }, 30)} />
+          </label>
+          <label className="bp-pick bp-doc"><span>Transaction</span>
+            <SearchSelect inputRef={docRef} ariaLabel="Transaction" disabled={source === 'direct'} value={docNo} pickFirstOnEnter
+              placeholder={source === 'direct' ? 'Not needed — add items in the table' : docs.length ? `Search ${sourceLabel} no., date, party` : `No ${sourceLabel} yet`}
+              options={docs.map((row) => ({ id: row.number, label: row.text }))} onChange={setDocNo}
+              onEnter={() => setTimeout(() => loadRef.current?.focus(), 30)} />
+          </label>
+          <button ref={loadRef} type="button" className="btn primary" disabled={source === 'direct' || !docNo || loading} onClick={loadDocument} data-sc="load-doc"
+            title="Label quantities come from the transaction: received qty, each serial number, each batch. Price Update loads 1 label per item with the new prices.">{loading ? 'Loading…' : 'Load'}</button>
         </div>
-        {source !== 'direct' ? (
-          <div className="bp-docbar">
-            <select value={docNo} onChange={(event) => setDocNo(event.target.value)} aria-label="Document">
-              <option value="">{docs.length ? `Choose ${SOURCES.find(([id]) => id === source)[1].replace('From ', '')}…` : 'No documents yet'}</option>
-              {docs.map((row) => <option key={row.number} value={row.number}>{row.text}</option>)}
-            </select>
-            <button type="button" className="btn primary" disabled={!docNo || loading} onClick={loadDocument} data-sc="load-doc">{loading ? 'Loading…' : 'Load items'}</button>
-            <span>Label quantities come from the document: received qty, each serial number, each batch. Price Update loads 1 label per item with the new prices.</span>
-          </div>
-        ) : null}
         {error ? <p className="banner">{error}</p> : null}
         <div className="ose-table bp-table" ref={scroller}>
           <table>
