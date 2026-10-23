@@ -140,3 +140,17 @@ export function pendingOf(lines, dir, done = {}, closed = false) {
   }
   return { pending, ordered: r2(ordered), converted: r2(converted), left: r2(left) };
 }
+
+// Every stock inward entry (Purchase receipt / invoice, Opening stock, Repacking, KIT/Combo packing) needs a Cost price,
+// an MRP and a Selling price. Returns the names that are missing (zero or blank), [] when all three are there.
+export function missingPrices({ cost, mrp, sale }) {
+  const pos = (v) => Number(v) > 0;
+  return [[cost, 'Cost price'], [mrp, 'MRP'], [sale, 'Selling price']].filter(([v]) => !pos(v)).map(([, name]) => name);
+}
+export const pricesNeeded = (what, missing) => `${what}: enter the ${missing.join(', ')} — every stock inward entry needs Cost price, MRP and Selling price.`;
+// the problem text for one inward row, or '' — a blank field falls back to the item master (fallback row)
+export function inwardPriceProblem(what, { cost, mrp, sale }, fallback = {}) {
+  const has = (v) => v !== '' && v != null;
+  const miss = missingPrices({ cost: has(cost) && Number(cost) > 0 ? cost : fallback.cost, mrp: has(mrp) ? mrp : fallback.mrp, sale: has(sale) ? sale : fallback.sale });
+  return miss.length ? pricesNeeded(what, miss) : '';
+}

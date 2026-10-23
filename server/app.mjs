@@ -36,6 +36,7 @@ import { ITEM_TYPES, alertAt, alertLevelAt, batchKey, cleanBatchRule, cleanCarto
 import { registerUom, unitResolver } from './uom.mjs';
 import { registerRepack } from './repack.mjs';
 import { registerKits } from './kits.mjs';
+import { missingPrices, pricesNeeded } from '../shared/documents.mjs';
 import { registerPrintTemplates } from './print-templates.mjs';
 
 // Item-wise settings kept in the item profile (Item Master → Item Configuration).
@@ -1867,6 +1868,12 @@ export async function createApp(options = {}) {
       for (const field of ['costPrice', 'mrp', 'salePrice']) {
         if (line[field] !== '' && line[field] != null && !(Number(line[field]) >= 0)) return fail(res, 400, 'INVALID', `${variant.sku}: ${field === 'costPrice' ? 'cost' : field === 'mrp' ? 'MRP' : 'selling price'} must be a number.`);
       }
+      {
+        // stock inward: Cost price, MRP and Selling price are compulsory (typed, else the item master's)
+        const given = (v, fb) => (v !== '' && v != null ? v : fb);
+        const miss = missingPrices({ cost: given(line.costPrice, variant.cost_price), mrp: given(line.mrp, variant.mrp), sale: given(line.salePrice, variant.sale_price) });
+        if (miss.length) return fail(res, 400, 'INVALID', pricesNeeded(`${product?.name || ''} (${variant.sku})`, miss));
+      }
       const expiry = await expiryOf(req, variant.id);
       if (expiry) {
         const batches = Array.isArray(line.batches) ? line.batches : [];
@@ -1886,6 +1893,11 @@ export async function createApp(options = {}) {
       if (!variant) return fail(res, 400, 'INVALID', 'A serialised item was not found.');
       const rows = (Array.isArray(set.rows) ? set.rows : []).filter((row) => String(row?.serial1 || '').trim() || String(row?.serial2 || '').trim());
       if (!rows.length) continue;
+      for (const row of rows) {
+        const given = (v, fb) => (v !== '' && v != null ? v : fb);
+        const miss = missingPrices({ cost: given(row.costPrice, variant.cost_price), mrp: given(row.mrp, variant.mrp), sale: given(row.salePrice, variant.sale_price) });
+        if (miss.length) return fail(res, 400, 'INVALID', pricesNeeded(`${variant.sku} S/N ${String(row.serial1 || row.serial2).trim()}`, miss));
+      }
       for (const row of rows) {
         for (const code of [row.serial1, row.serial2].map(serialKey).filter(Boolean)) {
           if (seen.has(code)) return fail(res, 400, 'INVALID', `Serial ${code} is entered twice in this entry.`);

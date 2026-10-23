@@ -9,7 +9,7 @@ import { checkBatches, formatExpiry } from '../../shared/expiry.mjs';
 import { useFitHeight } from './fit-height.js';
 import { CopyIcon, ItemSearch, KIND_LABEL, Popup, PopupTop, decimal, inr, message, num, typedRows } from './opening-stock.jsx';
 import { SerialGrid, SerialPicker, blankSerial, useSerialFields } from './stock-grids.jsx';
-import { DOC_TYPES, MODULE_PARTY, docTotals, docType, flatRows, lineAmounts, sourceTypes, stockDirection } from '../../shared/documents.mjs';
+import { DOC_TYPES, MODULE_PARTY, docTotals, docType, flatRows, inwardPriceProblem, lineAmounts, sourceTypes, stockDirection } from '../../shared/documents.mjs';
 import { applyFormula, formulaForSupplier, priceLine } from '../../shared/purchase-formula.mjs';
 import { STATES } from '../../shared/domain.mjs';
 import { OfferBar, PaymentPopup, useBillPromotions } from './bill-payment.jsx';
@@ -63,7 +63,7 @@ function newLine(item, meta, formula) {
     ...(item.units?.length && item.kind !== 'serial' ? { units: item.units, uom: uomOf(defaultUnit(item, meta.rate === 'cost' ? 'purchase' : 'sales')) } : {}), ...(item.child ? { child: item.child } : {}),
     ...(item.kind === 'matrix' ? { dims: item.dims || [], groupId: item.groupId || '' } : {}),
     productId: item.productId || '', categoryId: item.categoryId || '', brandId: item.brandId || '', eans: item.eans || [],
-    variants: item.variants.map((row) => ({ variantId: row.variantId, sku: row.sku, name: row.name, barcode: row.barcode || '', ...(row.attrs ? { attrs: row.attrs } : {}), qty: '', rate: rateOf(meta, row), basis: formula ? row.costPrice || '' : '', mrp: row.mrp || '', salePrice: row.salePrice || '', costPrice: row.costPrice || '' })),
+    variants: item.variants.map((row) => ({ variantId: row.variantId, sku: row.sku, name: row.name, barcode: row.barcode || '', ...(row.attrs ? { attrs: row.attrs } : {}), qty: '', rate: rateOf(meta, row), basis: formula ? row.costPrice || '' : '', mrp: row.mrp || '', salePrice: row.salePrice || '', costPrice: row.costPrice || '', itemMrp: row.mrp || '', itemSale: row.salePrice || '' })),
     serials: { variantId: first.variantId, rows: [] },
     picked: { variantId: first.variantId, ids: [], codes: [], rate: first.salePrice || '' },
   };
@@ -292,6 +292,9 @@ function CartonBar({ value, sizes = [], onChange }) {
   );
 }
 
+// item master MRP / selling of a variant (the line as built from the item) — used when the field is left blank
+const masterOf = (line, variantId) => { const v = (line.variants || []).find((row) => row.variantId === variantId) || {}; return { mrp: v.itemMrp ?? v.mrp, sale: v.itemSale ?? v.salePrice }; };
+
 function DiscField({ value, onChange, onKeyDown }) {
   return <label>Discount %<input inputMode="decimal" value={value} onChange={(event) => onChange(decimal(event.target.value))} onKeyDown={onKeyDown} /></label>;
 }
@@ -352,6 +355,11 @@ function QtyPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose,
     if (inward && num(row.mrp) > 0 && num(row.salePrice) > num(row.mrp)) { setError('Selling price is above the MRP.'); return; }
     const fill = inward && row.salePrice === '' && suggestion > 0 && selling?.apply !== 'suggest';
     const final = fill ? { ...draft, variants: draft.variants.map((v, i) => (i === 0 ? { ...v, salePrice: String(suggestion) } : v)) } : draft;
+    if (inward && !line.service) {
+      const v = final.variants[0] || {};
+      const problem = inwardPriceProblem(line.name, { cost: num(v.landing) || num(v.rate), mrp: v.mrp, sale: v.salePrice }, masterOf(line, v.variantId));
+      if (problem) { setError(problem); return; }
+    }
     onSave(lineWithUnits(batchPrice && dir < 0 ? { ...final, rateTyped: rateTouched || undefined } : final));
   }
   const parts = lotPrice && f === 1 && row.lots?.length > 1 ? splitByBatchPrice(lineWithUnits(draft)) : null;
@@ -485,6 +493,15 @@ function GridPopup({ line, meta, dir, inclusive, formula, party, onSave, onClose
     if (offLots) { setError(`${offLots.sku}: stock barcode quantities (${lotTotal(offLots.lots)}) must add up to ${num(offLots.qty) * f}.`); setFocusVariant(offLots.variantId); return; }
     const bad = inward && rows.find((row) => num(row.mrp) > 0 && num(row.salePrice) > num(row.mrp));
     if (bad) { setError(`${bad.sku}: selling price is above the MRP.`); return; }
+    if (inward) {
+      const sug = (own) => (selling?.enabled && selling.apply !== 'suggest' && own.salePrice === '' ? suggestOf(own) : 0);
+      for (const v of draft.variants) {
+        if (!(num(v.qty) > 0)) continue;
+        const own = rows.find((r) => r.variantId === v.variantId) || v;
+        const problem = inwardPriceProblem(`${line.name} (${v.sku || own.sku})`, { cost: num(v.landing) || num(v.rate), mrp: v.mrp, sale: num(sug(own)) > 0 ? sug(own) : v.salePrice }, masterOf(line, v.variantId));
+        if (problem) { setError(problem); setFocusVariant(v.variantId); return; }
+      }
+    }
     if (inward && selling?.enabled && selling.apply !== 'suggest') {
       const filled = draft.variants.map((row) => { const own = rows.find((r) => r.variantId === row.variantId) || row; const sug = suggestOf(own); return own.salePrice === '' && sug > 0 && num(own.qty) > 0 ? { ...row, salePrice: String(sug) } : row; });
       onSave(lineWithUnits({ ...draft, variants: filled }));
@@ -614,6 +631,14 @@ function SerialInPopup({ line, meta, dir, inclusive, formula, party, onSave, onC
     if (!filled.length) { setError('Enter at least one serial number.'); return; }
     const codes = filled.flatMap((row) => [row.serial1, row.serial2]).map((code) => String(code || '').trim().toUpperCase()).filter(Boolean);
     if (new Set(codes).size !== codes.length) { setError('Some serial numbers are repeated. They are marked in red.'); return; }
+    {
+      const auto = selling?.enabled && selling.apply !== 'suggest';
+      for (const r of draft.serials.rows.filter((row) => String(row.serial1 || '').trim())) {
+        const sale = (r.salePrice === '' || r.salePrice == null) && auto && suggestFor(r) > 0 ? suggestFor(r) : r.salePrice;
+        const problem = inwardPriceProblem(`${line.name} S/N ${r.serial1}`, { cost: num(r.landing) || num(r.costPrice), mrp: r.mrp, sale }, masterOf(line, variant.variantId));
+        if (problem) { setError(problem); return; }
+      }
+    }
     if (selling?.enabled && selling.apply !== 'suggest') {
       const priced = draft.serials.rows.map((r) => { const sug = suggestFor(r); return (r.salePrice === '' || r.salePrice == null) && sug > 0 ? { ...r, salePrice: String(sug) } : r; });
       onSave({ ...draft, serials: { ...draft.serials, rows: priced } });

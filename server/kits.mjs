@@ -6,6 +6,7 @@
 //         kit_packs (company_id, number, doc_date, location_id, data JSON lines, user_name, created_at)
 import { calcExpiry, cleanExpiry } from '../shared/expiry.mjs';
 import { cleanBatchRule, typeFromItem } from '../shared/item-types.mjs';
+import { missingPrices, pricesNeeded } from '../shared/documents.mjs';
 
 const n = (value) => { const v = Number(value); return Number.isFinite(v) ? v : 0; };
 const r3 = (value) => Math.round(n(value) * 1000) / 1000;
@@ -156,6 +157,9 @@ export function registerKits(app, store, deps) {
       if (kit.components.some((c) => c.missing)) return fail(res, 400, 'INVALID', `${kit.name}: an item in its mapping was removed — edit the mapping first.`);
       const kitQty = r3(raw.qty);
       if (!(kitQty > 0)) continue;
+      // stock inward: the kit's MRP / selling price (Item Master) and cost (mapped items) are compulsory
+      const missP = missingPrices({ cost: costOf(kit), mrp: kit.mrp, sale: kit.salePrice });
+      if (missP.length) return fail(res, 400, 'INVALID', pricesNeeded(`${kit.name} (${kit.sku})`, missP.map((m) => (m === 'Cost price' ? 'Cost price of the mapped items' : `${m} in its Item Master`))));
       const mfgDate = isDay(raw.mfgDate) ? raw.mfgDate : date;
       const typedExpiry = isDay(raw.expiryDate) ? raw.expiryDate : '';
       const batch = { batchNo: clean(raw.batchNo, 40).toUpperCase(), mfgDate, expiryDate: typedExpiry || (kit.expiry?.autoCalc ? calcExpiry(mfgDate, kit.expiry) : ''), typed: Boolean(typedExpiry) };

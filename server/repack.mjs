@@ -3,6 +3,7 @@
 // Table repack_entries: company_id, number, doc_date, location_id, data (JSON lines), user_name, created_at.
 import { calcExpiry, checkBatches, cleanExpiry } from '../shared/expiry.mjs';
 import { cleanBatchRule } from '../shared/item-types.mjs';
+import { missingPrices, pricesNeeded } from '../shared/documents.mjs';
 
 const n = (value) => { const v = Number(value); return Number.isFinite(v) ? v : 0; };
 const r3 = (value) => Math.round(n(value) * 1000) / 1000;
@@ -90,6 +91,9 @@ export function registerRepack(app, store, deps) {
       if (!pack) return fail(res, 400, 'INVALID', `Line ${index + 1}: choose a Repackaged Item.`);
       const packQty = r3(raw.qty);
       if (!(packQty > 0)) continue;
+      // stock inward: the pack's MRP / selling price (Item Master) and cost (bulk cost) are compulsory
+      const missP = missingPrices({ cost: pack.bulk.cost * pack.perPack, mrp: pack.mrp, sale: pack.salePrice });
+      if (missP.length) return fail(res, 400, 'INVALID', pricesNeeded(`${pack.name} (${pack.sku})`, missP.map((m) => (m === 'Cost price' ? `Cost price of the bulk item ${pack.bulk.name}` : `${m} in its Item Master`))));
       const loss = Math.max(r3(raw.loss), 0);
       const used = r3(packQty * pack.perPack + loss);
       const packExpiry = pack.expiry;

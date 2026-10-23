@@ -9,6 +9,9 @@ import { useFitHeight } from './fit-height.js';
 import { SerialGrid, blankSerial, useSerialFields } from './stock-grids.jsx';
 import { BatchEditor, batchTotal, blankBatch } from './batch-entry.jsx';
 import { checkBatches } from '../../shared/expiry.mjs';
+import { inwardPriceProblem } from '../../shared/documents.mjs';
+// item master prices of a variant (blank fields on the entry fall back to these)
+const masterPrices = (line, variantId) => { const v = (line.variants || []).find((row) => row.variantId === variantId) || {}; return { cost: v.itemCost ?? v.costPrice, mrp: v.itemMrp ?? v.mrp, sale: v.itemSale ?? v.salePrice }; };
 import { EanStrip, LocationStock, ScanBar, useScanMode } from './line-tools.jsx';
 import './line-tools.css';
 import { defaultUnit, factorOf, lineQtyText, openUnit, rowFromBase, rowToBase, swapRate, uomOf } from '../../shared/units.mjs';
@@ -237,6 +240,8 @@ function StandardPopup({ line, onSave, onClose }) {
   useEffect(() => { if (withBatches) setRow((current) => ({ ...current, qty: String(batchTotal(batches) || '') })); }, [batches, withBatches]);
   const set = (key) => (event) => setRow({ ...row, [key]: decimal(event.target.value) });
   function save() {
+    const priceProblem = inwardPriceProblem(line.name, { cost: row.costPrice, mrp: row.mrp, sale: row.salePrice }, masterPrices(line, row.variantId));
+    if (priceProblem) { setError(priceProblem); return; }
     if (withBatches) {
       const problem = checkBatches(batches, line.expiry, line.name);
       if (problem) { setError(problem); return; }
@@ -321,6 +326,11 @@ function MatrixPopup({ line, item, onItem, onSave, onClose }) {
   }
   function save() {
     if (!(total > 0)) { setError('Enter a quantity for at least one variant.'); return; }
+    for (const row of rows) {
+      if (!(num(row.qty) > 0)) continue;
+      const problem = inwardPriceProblem(`${line.name} (${row.sku})`, { cost: row.costPrice, mrp: row.mrp, sale: row.salePrice }, masterPrices(line, row.variantId));
+      if (problem) { setError(problem); return; }
+    }
     onSave({ ...line, uom: uomOf(unit), variants: rows.map((row) => costOut(row, unit)) });
   }
   const cols = [['qty', f !== 1 ? `Qty (${unit.name})` : 'Qty'], ['costPrice', f !== 1 ? `Cost ₹ / ${unit.name}` : 'Cost ₹'], ['mrp', 'MRP ₹'], ['salePrice', 'Selling ₹']];
@@ -407,6 +417,10 @@ function SerialPopup({ line, onSave, onClose }) {
     if (!filled.length) { setError('Enter at least one serial number.'); return; }
     const codes = filled.flatMap((row) => [row.serial1, row.serial2]).map((code) => String(code || '').trim().toUpperCase()).filter(Boolean);
     if (new Set(codes).size !== codes.length) { setError('Some serial numbers are repeated. They are marked in red.'); return; }
+    for (const r of filled) {
+      const problem = inwardPriceProblem(`${line.name} S/N ${r.serial1}`, { cost: r.costPrice, mrp: r.mrp, sale: r.salePrice }, masterPrices(line, variant.variantId));
+      if (problem) { setError(problem); return; }
+    }
     onSave({ ...line, serials: { variantId: variant.variantId, rows } });
   }
   return (
@@ -458,7 +472,7 @@ function newLine(item) {
     eans: item.eans || [],
     saved: false,
     ...(item.kind === 'matrix' ? { dims: item.dims || [], groupId: item.groupId || '' } : {}),
-    variants: item.variants.map((row) => ({ variantId: row.variantId, sku: row.sku, name: row.name, barcode: row.barcode || '', ...(row.attrs ? { attrs: row.attrs } : {}), qty: '', costPrice: row.costPrice || '', mrp: row.mrp || '', salePrice: row.salePrice || '' })),
+    variants: item.variants.map((row) => ({ variantId: row.variantId, sku: row.sku, name: row.name, barcode: row.barcode || '', ...(row.attrs ? { attrs: row.attrs } : {}), qty: '', costPrice: row.costPrice || '', mrp: row.mrp || '', salePrice: row.salePrice || '', itemCost: row.costPrice || '', itemMrp: row.mrp || '', itemSale: row.salePrice || '' })),
     serials: { variantId: item.variants[0]?.variantId, rows: [] },
   };
 }

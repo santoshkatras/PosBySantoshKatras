@@ -1,7 +1,7 @@
 // Purchase (PO → Receipt Note → Purchase Invoice) and sales (Quotation → Sales Order → Sales Bill)
 // documents. Table documents: company_id, module, doc_type, number, doc_date, party_id, party_name,
 // location_id, status, source_number, total, data (JSON), user_name, created_at.
-import { CONVERTED_STATUS, DOC_TYPES, MODULE_PARTY, discOf, docTotals, docType, flatRows, lineAmounts, nextDocNumber, partialStatus, pendingOf, qtyByVariant, sourceTypes, stockDirection } from '../shared/documents.mjs';
+import { CONVERTED_STATUS, DOC_TYPES, MODULE_PARTY, missingPrices, pricesNeeded, discOf, docTotals, docType, flatRows, lineAmounts, nextDocNumber, partialStatus, pendingOf, qtyByVariant, sourceTypes, stockDirection } from '../shared/documents.mjs';
 import { blankFormula, checkFormula, formulaForSupplier, priceLine } from '../shared/purchase-formula.mjs';
 import { cleanWarranty, coverFor } from '../shared/warranty.mjs';
 const localDayOf = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -283,6 +283,25 @@ export function registerDocuments(app, store, deps) {
       if (kind === 'serial' && dir === 0 && raw.serialInfo) line.serialInfo = clean(raw.serialInfo, 400);
       const priced = line.fx ? priceLine(line, formulaConfig.formulas.find((item) => item.id === line.fx.formulaId), party || {}, dir) : line;
       if (!flatRows(priced, dir).length) continue;
+      // stock inward (Receipt Note / direct Purchase Invoice): Cost price, MRP and Selling price are compulsory
+      if (module === 'purchase' && dir > 0 && !priced.service) {
+        const master = (id) => variants.find((item) => item.id === id) || {};
+        const has = (v) => v !== '' && v != null;
+        if (kind === 'serial') {
+          const v = master(priced.serials?.variantId);
+          for (const row of priced.serials?.rows || []) {
+            const miss = missingPrices({ cost: row.costPrice, mrp: has(row.mrp) ? row.mrp : v.mrp, sale: has(row.salePrice) ? row.salePrice : v.sale_price });
+            if (miss.length) return fail(res, 400, 'INVALID', pricesNeeded(`${product.name} S/N ${row.serial1 || row.serial2}`, miss));
+          }
+        } else {
+          for (const row of priced.variants) {
+            if (!(n(row.qty) > 0)) continue;
+            const v = master(row.variantId);
+            const miss = missingPrices({ cost: n(row.landing) || n(row.rate), mrp: has(row.mrp) ? row.mrp : v.mrp, sale: has(row.salePrice) ? row.salePrice : v.sale_price });
+            if (miss.length) return fail(res, 400, 'INVALID', pricesNeeded(`${product.name} (${row.sku})`, miss));
+          }
+        }
+      }
       lines.push(priced);
     }
     if (!lines.length) return fail(res, 400, 'INVALID', 'Add at least one item with a quantity.');
